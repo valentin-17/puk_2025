@@ -75,8 +75,8 @@ class WarmSchrank:
     def __init__(self, env, delay):
         self.env = env
         self.delay = delay
-        self.store = PriorityFilterStore(env) # sum = -3698 for p_of_failure = 0.5
-        #self.store = FilterStore(env) # sum = -3775.332 for p_of_failure = 0,5 
+        #self.store = PriorityFilterStore(env) # sum = -1864 for p_of_failure = 0.5
+        self.store = FilterStore(env) # sum = -1871 for p_of_failure = 0,5 
 
     def latency(self, value):
         yield self.env.timeout(self.delay)
@@ -123,7 +123,6 @@ def Burgermeister(env, bestellung_list, warm_schrank):
         warme_zutaten = yield warm_schrank.get(lambda x: x.get_deadline() < 5)
         
         print("PRIO",warme_zutaten.get_deadline())
-        sum += warme_zutaten.get_deadline()
 
         if np.random.rand() <= 0.5:
         #if np.random.rand() <= 0.5:
@@ -133,6 +132,9 @@ def Burgermeister(env, bestellung_list, warm_schrank):
             #print(f'Deliverd at time: {env.now}')
             print("etikitieren")
             # TODO etikitieren
+            if warme_zutaten.get_deadline() < 0:
+                sum += warme_zutaten.get_deadline()
+
         print("sum", sum)
 
         
