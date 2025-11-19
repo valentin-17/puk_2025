@@ -4,4 +4,5 @@ def generate_burger_orders(n: int) -> list:
 
     :param n: number of burger orders to generate
     """
+
     raise NotImplementedError('Has not yet been implemented')
