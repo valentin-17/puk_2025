@@ -35,35 +35,35 @@ class Burgenerator:
         self.timeline_events = []
 
     def prepare(self):
-        # we can assume that the prep_time is always freezer prep time + warm prep time since every burger has to have
-        # at least one patty. the prep time is then independent of the total amount of warm ingredients.
-        prep_time = (GEN.gamma(c.FREEZER_PREP_TIME_SHAPE, c.FREEZER_PREP_TIME_SCALE)
-                     + GEN.uniform(c.WARM_PROCESSING_TIME_LOW, c.WARM_PROCESSING_TIME_HIGH))
+        # we can assume that the prep_time is only freezer prep time since the linecook takes the ingredients from the
+        # freezer, puts them on the grill and then can move on to the next order. for simplicity’s sake we assume that
+        # the grill always has enough space for the next patty. the prep time is then independent of the total amount of
+        # warm ingredients.
+        prep_time = GEN.gamma(c.FREEZER_PREP_TIME_SHAPE, c.FREEZER_PREP_TIME_SCALE)
         yield self.env.timeout(prep_time)
-        #print(f'Warm ingredients prepared in {prep_time:.2f} seconds.')
-        return prep_time
+        grill_event = self.env.process(self.grill())
+        return prep_time, grill_event
+
+    def grill(self):
+        grill_time = GEN.uniform(c.WARM_PROCESSING_TIME_LOW, c.WARM_PROCESSING_TIME_HIGH)  # seconds
+        yield self.env.timeout(grill_time)
+        return grill_time
 
     def refill(self):
         refill_time = GEN.normal(c.REFILL_TIME_MEAN, c.REFILL_TIME_SCALE)
         yield self.env.timeout(refill_time)
         return refill_time
 
-    def assemble(self, burger):
+    def assemble(self, burger, grill_event):
         # only count assembly time for the cold ingredients plus the toasting time, buns are also not considered a cold
         # ingredient as they have the 40-second toasting time
+        yield grill_event
         assembly_time = (c.TOASTING_TIME
                          + (GEN.normal(c.ASSEMBLY_TIME_PER_INGREDIENT_MEAN, c.ASSEMBLY_TIME_PER_INGREDIENT_SCALE)
-                         * sum(v for k, v in burger.items() if k not in ['bun', 'patty', 'bacon'])))
+                            * sum(v for k, v in burger.items() if k not in ['bun', 'patty', 'bacon'])))
         yield self.env.timeout(assembly_time)
-        #print(f'Burger assembled in {assembly_time:.2f} seconds.')
         return assembly_time
 
-    def package(self):
-        packing_time = GEN.uniform(c.PACKING_TIME_LOW, c.PACKING_TIME_HIGH)
-        if GEN.random() < c.FRIES_PROB:
-            packing_time += GEN.uniform(c.PACKING_TIME_FRIES_LOW, c.PACKING_TIME_FRIES_HIGH)
-        yield self.env.timeout(packing_time)
-        return packing_time
 
 def _incoming_orders(env, burgenerator):
     """Generates orders from SIM_START until SIM_END."""
@@ -122,7 +122,7 @@ def _burger_process(env, burgenerator, burger, order_id):
             burgenerator.usage_stats['prep_wait'].append(prep_wait_end - prep_wait_start)
 
             prep_start = env.now
-            prep_duration = yield env.process(burgenerator.prepare())
+            prep_duration, grill_event = yield env.process(burgenerator.prepare())
             prep_end = env.now
             burgenerator.timeline_events.append({
                 'order_id': order_id,
@@ -162,7 +162,7 @@ def _burger_process(env, burgenerator, burger, order_id):
             burgenerator.usage_stats['assembly_wait'].append(assembly_wait_end - assembly_wait_start)
 
             assembly_start = env.now
-            assembly_duration = yield env.process(burgenerator.assemble(burger))
+            assembly_duration = yield env.process(burgenerator.assemble(burger, grill_event))
             assembly_end = env.now
             burgenerator.timeline_events.append({
                 'order_id': order_id,
@@ -208,10 +208,9 @@ def _analyze_results(burgenerator):
     stats['avg_process_time_per_burger'] =  np.mean(burgenerator.order_stats['total_time'])
     total_prep_work = np.sum(burgenerator.usage_stats['prep_work'])
     total_assembly_work = np.sum(burgenerator.usage_stats['assembly_work'])
-    total_prep_occupied = total_prep_work
     total_prep_time_available = c.N_LINECOOKS * total_time
     total_assembly_time_available = c.N_ASSEMBLERS * total_time
-    stats['prep_idle_percent'] = (1 - (total_prep_occupied / total_prep_time_available)) * 100
+    stats['prep_idle_percent'] = (1 - (total_prep_work / total_prep_time_available)) * 100
     stats['assembly_idle_percent'] = (1 - (total_assembly_work / total_assembly_time_available)) * 100
 
     return stats

@@ -18,7 +18,7 @@ VEGGIE_MU = 1.97
 
 # Simulation Parameters
 # Random state
-SEED = 42
+SEED = 1
 
 # Timings in seconds
 SIM_START = 11 * 3600 # 11 hours * 3600 seconds/hour

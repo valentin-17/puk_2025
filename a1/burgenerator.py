@@ -24,22 +24,6 @@ Implementation Details:
   Gemini CLI has also been used to implement an elegant logging solution of simulation statistics during the simulation
   runs, since my experience with these datastructures is limited. The benefit was a very fast development of the
   otherwise tedious overhead of logging such that I was able to focus my time on the actual simulation implementation.
-
-Insights:
-  With 2 linecooks and 1 burgermaster the burgenerator has a significant bottleneck at the prep station (linecooks) as
-  they have basically 0 idle time and are constantly working (1.12% idle time). The burgermaster on the other hand works
-  only ~40% of the time as they need to wait for the prep station. At this rate with 30-40 incoming orders per hour it
-  takes more than 7.5 hours to clear all orders. The average wait time for a burger exceeds the pickup time by a delta
-  of ~115 minutes. The burger needs ~145 minutes of processing time counted from receiving the order until it has been
-  packed.
-
-  Increasing the number of linecooks (i.e. relieving the bottleneck) quickly reduces the total lunchtime to ~4 hours
-  at 4 linecooks. With 4 linecooks students only wait around 7.5 minutes for their burger after their original pickup
-  window. Increasing the burgermasters (assemblers) has no meaningful impact at 4 linecooks. This is also supported by
-  the comparably low idle time for assemblers of ~24% (1 assembler, 4 linecooks) versus ~60% (2 assemblers, 4 linecooks).
-  The most even distribution of idle time was achieved by 5 linecooks and 1 assembler minimizing both idletimes to about
-  14% for both stations. The resource utilization visualizations also show this effect pretty well as the utilization
-  bars are almost fully filled out at a 5 to 1 ratio.
 """
 import random
 from collections import defaultdict
@@ -65,22 +49,28 @@ class Burgenerator:
         self.timeline_events = []
 
     def prepare(self):
-        # we can assume that the prep_time is always freezer prep time + warm prep time since every burger has to have
-        # at least one patty. the prep time is then independent of the total amount of warm ingredients.
-        prep_time = (GEN.gamma(c.FREEZER_PREP_TIME_SHAPE, c.FREEZER_PREP_TIME_SCALE)
-                     + GEN.uniform(c.WARM_PROCESSING_TIME_LOW, c.WARM_PROCESSING_TIME_HIGH))
+        # we can assume that the prep_time is only freezer prep time since the linecook takes the ingredients from the
+        # freezer, puts them on the grill and then can move on to the next order. for simplicity’s sake we assume that
+        # the grill always has enough space for the next patty. the prep time is then independent of the total amount of
+        # warm ingredients.
+        prep_time = GEN.gamma(c.FREEZER_PREP_TIME_SHAPE, c.FREEZER_PREP_TIME_SCALE)
         yield self.env.timeout(prep_time)
-        #print(f'Warm ingredients prepared in {prep_time:.2f} seconds.')
-        return prep_time
+        grill_event = self.env.process(self.grill())
+        return prep_time, grill_event
 
-    def assemble(self, burger):
+    def grill(self):
+        grill_time = GEN.uniform(c.WARM_PROCESSING_TIME_LOW, c.WARM_PROCESSING_TIME_HIGH)  # seconds
+        yield self.env.timeout(grill_time)
+        return grill_time
+
+    def assemble(self, burger, grill_event):
         # only count assembly time for the cold ingredients plus the toasting time, buns are also not considered a cold
         # ingredient as they have the 40-second toasting time
+        yield grill_event
         assembly_time = (c.TOASTING_TIME
                          + (GEN.normal(c.ASSEMBLY_TIME_PER_INGREDIENT_MEAN, c.ASSEMBLY_TIME_PER_INGREDIENT_SCALE)
                          * sum(v for k, v in burger.items() if k not in ['bun', 'patty', 'bacon'])))
         yield self.env.timeout(assembly_time)
-        #print(f'Burger assembled in {assembly_time:.2f} seconds.')
         return assembly_time
 
     def package(self):
@@ -127,100 +117,102 @@ def _burger_process(env, burgenerator, burger, order_id):
     environment (i.e. Theke 3) in which the tasks are done. The individual tasks are modeled in the burgenerator class
     while inter-task activities like the failure of assembly or the wait to start the assembly are modeled here in this
     method. Further various timings and statistics are tracked to allow for later analysis."""
-    order_time = env.now
-    pickup_time = order_time + c.PICKUP_DELAY
-    rework_count = 0
-
-    #print(f'Order received with {sum(burger.values()):<2} ingredients: {burger}')
     while True:
-        prep_wait_start = env.now
-        with burgenerator.prep.request() as req:
-            yield req
-            prep_wait_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'prep_wait',
-                'start': prep_wait_start,
-                'end': prep_wait_end,
-                'resource': 'prep_station'
-            })
-            burgenerator.usage_stats['prep_wait'].append(prep_wait_end - prep_wait_start)
+        order_time = env.now
+        pickup_time = order_time + c.PICKUP_DELAY
+        rework_count = 0
 
-            prep_start = env.now
-            prep_duration = yield env.process(burgenerator.prepare())
-            prep_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'prep',
-                'start': prep_start,
-                'end': prep_end,
-                'resource': 'prep_station'
-            })
-            burgenerator.usage_stats['prep_work'].append(prep_duration)
-
-        # if the pickup time is more than 5 minutes in the future don't start the burger
-        if env.now < pickup_time - 300:
-            assembly_wait_to_begin_start = env.now
-            dt = (pickup_time - 300) - env.now
-            burgenerator.usage_stats['assembly_wait_to_begin'].append(dt)
-            yield env.timeout(dt)
-            assembly_wait_to_begin_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'assembly_wait_to_begin',
-                'start': assembly_wait_to_begin_start,
-                'end': assembly_wait_to_begin_end,
-                'resource': 'assembly'
-            })
-
-        assembly_wait_start = env.now
-        with burgenerator.assembly.request() as req:
-            yield req
-            assembly_wait_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'assembly_wait',
-                'start': assembly_wait_start,
-                'end': assembly_wait_end,
-                'resource': 'assembly'
-            })
-            burgenerator.usage_stats['assembly_wait'].append(assembly_wait_end - assembly_wait_start)
-
-            assembly_start = env.now
-            assembly_duration = yield env.process(burgenerator.assemble(burger))
-            assembly_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'assembly_work',
-                'start': assembly_start,
-                'end': assembly_end,
-                'resource': 'assembly'
-            })
-            burgenerator.usage_stats['assembly_work'].append(assembly_duration)
-
-            # after assembling, errors can be found with a 5% chance
-            if GEN.random() < c.FAIL_PROB:
-                rework_count += 1
-                # if burger assembly fails re-enter the loop once more
-                # such that the failed burger gets remade immediately
-                continue
-            else:
-                packing_start = env.now
-                packing_duration = yield env.process(burgenerator.package())
-                packing_end = env.now
+        #print(f'Order received with {sum(burger.values()):<2} ingredients: {burger}')
+        while True:
+            prep_wait_start = env.now
+            with burgenerator.prep.request() as req:
+                yield req
+                prep_wait_end = env.now
                 burgenerator.timeline_events.append({
                     'order_id': order_id,
-                    'stage': 'assembly_packing',
-                    'start': packing_start,
-                    'end': packing_end,
+                    'stage': 'prep_wait',
+                    'start': prep_wait_start,
+                    'end': prep_wait_end,
+                    'resource': 'prep_station'
+                })
+                burgenerator.usage_stats['prep_wait'].append(prep_wait_end - prep_wait_start)
+
+                prep_start = env.now
+                prep_duration, grill_event = yield env.process(burgenerator.prepare())
+                prep_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'prep',
+                    'start': prep_start,
+                    'end': prep_end,
+                    'resource': 'prep_station'
+                })
+                burgenerator.usage_stats['prep_work'].append(prep_duration)
+
+            # if the pickup time is more than 5 minutes in the future don't start the burger
+            if env.now < pickup_time - 300:
+                assembly_wait_to_begin_start = env.now
+                dt = (pickup_time - 300) - env.now
+                burgenerator.usage_stats['assembly_wait_to_begin'].append(dt)
+                yield env.timeout(dt)
+                assembly_wait_to_begin_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'assembly_wait_to_begin',
+                    'start': assembly_wait_to_begin_start,
+                    'end': assembly_wait_to_begin_end,
                     'resource': 'assembly'
                 })
-                burgenerator.usage_stats['assembly_work'].append(packing_duration)
-                # if the burger is assembled successfully we can break out of the loop
-                break
 
-    burgenerator.order_stats['total_time'].append(env.now - order_time)
-    burgenerator.order_stats['num_reworks'].append(rework_count)
+            assembly_wait_start = env.now
+            with burgenerator.assembly.request() as req:
+                yield req
+                assembly_wait_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'assembly_wait',
+                    'start': assembly_wait_start,
+                    'end': assembly_wait_end,
+                    'resource': 'assembly'
+                })
+                burgenerator.usage_stats['assembly_wait'].append(assembly_wait_end - assembly_wait_start)
+
+                assembly_start = env.now
+                assembly_duration = yield env.process(burgenerator.assemble(burger, grill_event))
+                assembly_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'assembly_work',
+                    'start': assembly_start,
+                    'end': assembly_end,
+                    'resource': 'assembly'
+                })
+                burgenerator.usage_stats['assembly_work'].append(assembly_duration)
+
+                # after assembling, errors can be found with a 5% chance
+                if GEN.random() < c.FAIL_PROB:
+                    rework_count += 1
+                    # if burger assembly fails re-enter the loop once more
+                    # such that the failed burger gets remade immediately
+                    continue
+                else:
+                    packing_start = env.now
+                    packing_duration = yield env.process(burgenerator.package())
+                    packing_end = env.now
+                    burgenerator.timeline_events.append({
+                        'order_id': order_id,
+                        'stage': 'assembly_packing',
+                        'start': packing_start,
+                        'end': packing_end,
+                        'resource': 'assembly'
+                    })
+                    burgenerator.usage_stats['assembly_work'].append(packing_duration)
+                    # if the burger is assembled successfully we can break out of the loop
+                    break
+
+        burgenerator.order_stats['total_time'].append(env.now - order_time)
+        burgenerator.order_stats['num_reworks'].append(rework_count)
+        break
 
 def _analyze_results(burgenerator):
     """Collects various statistics for a single simulation run."""
@@ -233,10 +225,9 @@ def _analyze_results(burgenerator):
     stats['avg_process_time_per_burger'] =  np.mean(burgenerator.order_stats['total_time'])
     total_prep_work = np.sum(burgenerator.usage_stats['prep_work'])
     total_assembly_work = np.sum(burgenerator.usage_stats['assembly_work'])
-    total_prep_occupied = total_prep_work
     total_prep_time_available = c.N_LINECOOKS * total_time
     total_assembly_time_available = c.N_ASSEMBLERS * total_time
-    stats['prep_idle_percent'] = (1 - (total_prep_occupied / total_prep_time_available)) * 100
+    stats['prep_idle_percent'] = (1 - (total_prep_work / total_prep_time_available)) * 100
     stats['assembly_idle_percent'] = (1 - (total_assembly_work / total_assembly_time_available)) * 100
     stats['avg_student_wait'] = np.mean(burgenerator.order_stats['total_time']) - c.PICKUP_DELAY # we have to deduct the pickup delay here to get the true wait time on a burger
 
