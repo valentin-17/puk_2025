@@ -1,7 +1,7 @@
 """
 To save time this file was mostly written by Google's Gemini CLI. The quality of the code produced by the agent is
-impressive. Only minor adjustments in naming and organizing the code have to be made to receive usable plotting utility
-functions.
+impressive in my opionion. Only minor adjustments in naming and organizing the code have to be made to receive usable
+plotting utility functions.
 
 The file hosts two methods. The create_gantt_chart method holds all burger orders on the x-axis and displays the entire
 simulation run as a timeline. Here we can observe how long an order waits until it gets processed. It is important to
@@ -12,12 +12,6 @@ To view the process at Theke 3 from the resource perspective (i.e. the workers) 
 useful. The plot shows the utilization of the linecooks as well as the utilization of the burgermaster. Here it becomes
 clear that the burgermaster has high downtime and often waits for the preparation of the warm ingredients. This also
 visually confirms the numerical bottleneck that has been identified in the analysis step of the burgenerator.
-
-If we double the number of linecooks the overall time of the lunchbreak decreases as well as the wait time for a burger,
-which both is reflected in the gantt chart and the resource chart. 5 linecooks seem to be too much as then the
-assembly step waits to fulfill the 30-minute lead time of an order indicated by the assembly idle time between prep
-finish and assembly start. If we want to satisfy the shortest wait time though 5 linecooks seem to be spot on for the
-scenario as burgers are on average slightly too early (~0.5 min).
 """
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,10 +35,6 @@ C_MAP = {
 
 def create_gantt_chart(timeline_events, path):
     """Creates and saves a Gantt chart of the burger simulation."""
-    if timeline_events.empty:
-        print("No timeline events to plot.")
-        return
-
     timeline_events['duration'] = timeline_events['end'] - timeline_events['start']
 
     fig, ax = plt.subplots(figsize=(20, 10))
@@ -82,10 +72,6 @@ def create_gantt_chart(timeline_events, path):
 
 def create_resource_chart(timeline_events, path):
     """Creates and saves a chart of resource utilization over time."""
-    if timeline_events.empty:
-        print("No timeline events to plot.")
-        return
-
     timeline_events['duration'] = timeline_events['end'] - timeline_events['start']
     
     resource_lanes = []

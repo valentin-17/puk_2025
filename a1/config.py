@@ -1,4 +1,4 @@
-# Define parameters for the distributions
+# Parameters for the distributions
 # Binomial Distributions
 BUN_N = 1
 BUN_P = 1
@@ -16,10 +16,10 @@ SPICE_MU = 0.98
 CHEESE_MU = 0.90
 VEGGIE_MU = 1.97
 
+# Simulation Parameters
 # Random state
 SEED = 42
 
-# Simulation Params
 # Timings in seconds
 SIM_START = 11 * 3600 # 11 hours * 3600 seconds/hour
 SIM_END = 14 * 3600
@@ -42,7 +42,7 @@ PACKING_TIME_FRIES_LOW = 15
 PACKING_TIME_FRIES_HIGH = 30
 
 # Other params
-N_LINECOOKS = 5
+N_LINECOOKS = 6
 N_ASSEMBLERS = 2
 
 MIN_INGREDIENTS = 2

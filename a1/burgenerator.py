@@ -1,4 +1,4 @@
-'''
+"""
 Planning and Configuration: Practical Task 1
 
 Scenario:
@@ -11,8 +11,8 @@ Implementation Details:
   This implementation is mostly based on the CarWash example in simpy's documentation. To get a quick skeleton of the
   simulation pipeline Google's Gemini CLI has been used to propose an outline and code scaffolding that then could be
   filled in with implementation details by myself using the simpy documentation as reference. I got stuck on the
-  implementation of the 5% fail chance. Here came another notable contribution of Gemini CLI with the 'while True:'
-  section in the _burger_process method to elegantly implement the breakout condition of a failed burger.
+  implementation of the 5% fail chance. Here came another notable contribution of Gemini CLI with the idea of the
+  'while True:' section in the _burger_process method to elegantly implement the breakout condition of a failed burger.
 
   Burger sampling is done with the derived distributions but could have been abstracted further as it is not of interest
   which cold ingredients get chosen just the total amount.
@@ -24,7 +24,23 @@ Implementation Details:
   Gemini CLI has also been used to implement an elegant logging solution of simulation statistics during the simulation
   runs, since my experience with these datastructures is limited. The benefit was a very fast development of the
   otherwise tedious overhead of logging such that I was able to focus my time on the actual simulation implementation.
-'''
+
+Insights:
+  With 2 linecooks and 1 burgermaster the burgenerator has a significant bottleneck at the prep station (linecooks) as
+  they have basically 0 idle time and are constantly working (1.12% idle time). The burgermaster on the other hand works
+  only ~40% of the time as they need to wait for the prep station. At this rate with 30-40 incoming orders per hour it
+  takes more than 7.5 hours to clear all orders. The average wait time for a burger exceeds the pickup time by a delta
+  of ~115 minutes. The burger needs ~145 minutes of processing time counted from receiving the order until it has been
+  packed.
+
+  Increasing the number of linecooks (i.e. relieving the bottleneck) quickly reduces the total lunchtime to ~4 hours
+  at 4 linecooks. With 4 linecooks students only wait around 7.5 minutes for their burger after their original pickup
+  window. Increasing the burgermasters (assemblers) has no meaningful impact at 4 linecooks. This is also supported by
+  the comparably low idle time for assemblers of ~24% (1 assembler, 4 linecooks) versus ~60% (2 assemblers, 4 linecooks).
+  The most even distribution of idle time was achieved by 5 linecooks and 1 assembler minimizing both idletimes to about
+  14% for both stations. The resource utilization visualizations also show this effect pretty well as the utilization
+  bars are almost fully filled out at a 5 to 1 ratio.
+"""
 import random
 from collections import defaultdict
 
@@ -39,7 +55,7 @@ GEN = np.random.default_rng(c.SEED)
 
 
 class Burgenerator:
-    '''Holds the metadata for Theke 3 during a simulation run.'''
+    """Holds the metadata for Theke 3 during a simulation run."""
     def __init__(self, env: simpy.Environment):
         self.env = env
         self.prep: simpy.Resource = simpy.Resource(env, capacity=c.N_LINECOOKS)
@@ -75,7 +91,7 @@ class Burgenerator:
         return packing_time
 
 def _incoming_orders(env, burgenerator):
-    '''Generates orders from SIM_START until SIM_END.'''
+    """Generates orders from SIM_START until SIM_END."""
     order_window = c.SIM_END - c.SIM_START
     order_id = 0
     while env.now < order_window:
@@ -86,10 +102,8 @@ def _incoming_orders(env, burgenerator):
         yield env.timeout(max(0, order_downtime))
 
 def _sample_burger():
-    '''
-    Samples a random burger with MIN_INGREDIENTS and MAX_INGREDIENTS and at least one bun and one patty. Invalid burgers
-    are immediately rejected.
-    '''
+    """Samples a random burger with MIN_INGREDIENTS and MAX_INGREDIENTS and at least one bun and one patty. Invalid burgers
+    are immediately rejected."""
     while True:
         burger = {
             'bun': np.random.binomial(c.BUN_N, c.BUN_P),
@@ -109,6 +123,10 @@ def _sample_burger():
             return burger
 
 def _burger_process(env, burgenerator, burger, order_id):
+    """Simulates a order process from incoming order to finished burger. This method uses the burgenerator class as the
+    environment (i.e. Theke 3) in which the tasks are done. The individual tasks are modeled in the burgenerator class
+    while inter-task activities like the failure of assembly or the wait to start the assembly are modeled here in this
+    method. Further various timings and statistics are tracked to allow for later analysis."""
     order_time = env.now
     pickup_time = order_time + c.PICKUP_DELAY
     rework_count = 0
@@ -205,12 +223,14 @@ def _burger_process(env, burgenerator, burger, order_id):
     burgenerator.order_stats['num_reworks'].append(rework_count)
 
 def _analyze_results(burgenerator):
+    """Collects various statistics for a single simulation run."""
     stats = {}
     total_time = burgenerator.env.now
 
-    stats['avg_prep_wait'] = np.mean(burgenerator.usage_stats['prep_wait']) if burgenerator.usage_stats['prep_wait'] else 0
-    stats['avg_assembly_wait'] = np.mean(burgenerator.usage_stats['assembly_wait']) if burgenerator.usage_stats['assembly_wait'] else 0
+    stats['avg_prep_wait'] = np.mean(burgenerator.usage_stats['prep_wait'])
+    stats['avg_assembly_wait'] = np.mean(burgenerator.usage_stats['assembly_wait'])
     stats['total_sim_duration'] = total_time
+    stats['avg_process_time_per_burger'] =  np.mean(burgenerator.order_stats['total_time'])
     total_prep_work = np.sum(burgenerator.usage_stats['prep_work'])
     total_assembly_work = np.sum(burgenerator.usage_stats['assembly_work'])
     total_prep_occupied = total_prep_work
@@ -218,11 +238,12 @@ def _analyze_results(burgenerator):
     total_assembly_time_available = c.N_ASSEMBLERS * total_time
     stats['prep_idle_percent'] = (1 - (total_prep_occupied / total_prep_time_available)) * 100
     stats['assembly_idle_percent'] = (1 - (total_assembly_work / total_assembly_time_available)) * 100
-    stats['avg_student_wait'] = np.mean(burgenerator.order_stats['total_time']) - c.PICKUP_DELAY if burgenerator.order_stats['total_time'] else 0 # we have to deduct the pickup delay here to get the true wait time on a burger
+    stats['avg_student_wait'] = np.mean(burgenerator.order_stats['total_time']) - c.PICKUP_DELAY # we have to deduct the pickup delay here to get the true wait time on a burger
 
     return stats
 
 def run_single_simulation(seed):
+    """Runs a single simulation with a set seed. Seed generation is random each time the method is called."""
     np.random.seed(seed)
     global GEN
     GEN = np.random.default_rng(seed)
@@ -235,12 +256,15 @@ def run_single_simulation(seed):
     return burgenerator
 
 def log_print(*args, **kwargs):
+    """Logs and simultaneously prints the given arguments to console. This was written by Gemini CLI"""
     message = ' '.join(str(a) for a in args)
     with open('simlog.txt', 'a') as f:
         f.write(message + ('\n' if not kwargs.get('end') else ''))
     print(*args, **kwargs)
 
 def run_simulations():
+    """Orchestrates N_SIMS simulations, collects their statistics and calculates measures to answer the questions of the
+    task. Printing strings and their formatting have been contributed by Gemini CLI."""
     log_print(f'Running {c.N_SIMS} simulations using {c.N_LINECOOKS} linecooks and {c.N_ASSEMBLERS} assemblers.')
     all_results = []
     for i in range(c.N_SIMS):
@@ -254,8 +278,8 @@ def run_simulations():
     avg_assembly_wait = df['avg_assembly_wait'].mean()
     bottleneck = 'Prep Station (linecooks)' if avg_prep_wait > avg_assembly_wait else 'Assembly Station (burgermaster)'
     log_print('\nQ1: Which areas of work lead to bottlenecks?')
-    log_print(f'- Avg. Wait for Prep: {avg_prep_wait:.2f} seconds')
-    log_print(f'- Avg. Wait for Assembly: {avg_assembly_wait:.2f} seconds')
+    log_print(f'- An avg. order waits {avg_prep_wait:.2f} seconds to be prepared')
+    log_print(f'- An avg. order waits {avg_assembly_wait:.2f} seconds to be assembled')
     log_print(f'--> The primary bottleneck is the {bottleneck}.')
 
     avg_lunch_break = df['total_sim_duration'].mean()
@@ -264,13 +288,17 @@ def run_simulations():
 
     avg_prep_idle = df['prep_idle_percent'].mean()
     avg_assembly_idle = df['assembly_idle_percent'].mean()
-    log_print('\nQ3: How much idle time do the assistants and the burger chef have on average?')
-    log_print(f'- Assistants (Prep): {avg_prep_idle:.2f}% idle time.')
-    log_print(f'- Burger Chef (Assembly): {avg_assembly_idle:.2f}% idle time.')
+    log_print('\nQ3: How much idle time do the linecooks and the Burgermaster have on average?')
+    log_print(f'- Linecooks (Prep): {avg_prep_idle:.2f}% idle time.')
+    log_print(f'- Burgermaster (Assembly): {avg_assembly_idle:.2f}% idle time.')
 
     avg_student_wait = df['avg_student_wait'].mean()
     log_print(f'\nQ4: How long do students wait on average for their burgers?')
     log_print(f'Students wait on average {avg_student_wait / 60:.2f} minutes ({avg_student_wait:.2f} seconds).')
+
+    avg_process_time_per_burger = df['avg_process_time_per_burger'].mean()
+    log_print(f'\nThe average burger takes {avg_process_time_per_burger / 60:.2f} minutes '
+              f'({avg_process_time_per_burger:.2f} seconds) to process from receiving the order to finish packaging.')
     log_print('-' * 16, 'END OF RUN', '-' * 16, '\n')
 
 if __name__ == '__main__':

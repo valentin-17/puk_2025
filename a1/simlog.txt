@@ -1,144 +1,160 @@
 Running 500 simulations using 2 linecooks and 1 assemblers.
 
 Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 7639.06 seconds
-- Avg. Wait for Assembly: 10.10 seconds
+- An avg. order waits 7639.06 seconds to be prepared
+- An avg. order waits 10.10 seconds to be assembled
 --> The primary bottleneck is the Prep Station (linecooks).
 
 Q2: How long does the average lunch break last at counter 3?
 The average time to clear all orders is 7.66 hours (27565.57 seconds).
 
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 1.12% idle time.
-- Burger Chef (Assembly): 60.81% idle time.
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 1.12% idle time.
+- Burgermaster (Assembly): 60.81% idle time.
 
 Q4: How long do students wait on average for their burgers?
 Students wait on average 115.27 minutes (6916.39 seconds).
+
+The average burger takes 145.27 minutes (8716.39 seconds) to process from receiving the order to finish packaging.
 ---------------- END OF RUN ---------------- 
 
 Running 500 simulations using 4 linecooks and 1 assemblers.
 
 Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 1264.78 seconds
-- Avg. Wait for Assembly: 46.87 seconds
+- An avg. order waits 1264.78 seconds to be prepared
+- An avg. order waits 46.87 seconds to be assembled
 --> The primary bottleneck is the Prep Station (linecooks).
 
 Q2: How long does the average lunch break last at counter 3?
 The average time to clear all orders is 3.96 hours (14247.68 seconds).
 
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 3.88% idle time.
-- Burger Chef (Assembly): 23.90% idle time.
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 3.88% idle time.
+- Burgermaster (Assembly): 23.90% idle time.
 
 Q4: How long do students wait on average for their burgers?
 Students wait on average 7.50 minutes (450.16 seconds).
+
+The average burger takes 37.50 minutes (2250.16 seconds) to process from receiving the order to finish packaging.
 ---------------- END OF RUN ---------------- 
 
 Running 500 simulations using 5 linecooks and 1 assemblers.
 
 Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 131.31 seconds
-- Avg. Wait for Assembly: 117.35 seconds
+- An avg. order waits 131.31 seconds to be prepared
+- An avg. order waits 117.35 seconds to be assembled
 --> The primary bottleneck is the Prep Station (linecooks).
 
 Q2: How long does the average lunch break last at counter 3?
 The average time to clear all orders is 3.52 hours (12663.55 seconds).
 
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 13.50% idle time.
-- Burger Chef (Assembly): 14.42% idle time.
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 13.50% idle time.
+- Burgermaster (Assembly): 14.42% idle time.
 
 Q4: How long do students wait on average for their burgers?
 Students wait on average -0.57 minutes (-34.17 seconds).
+
+The average burger takes 29.43 minutes (1765.83 seconds) to process from receiving the order to finish packaging.
 ---------------- END OF RUN ---------------- 
 
 Running 500 simulations using 6 linecooks and 1 assemblers.
 
 Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 5.05 seconds
-- Avg. Wait for Assembly: 119.30 seconds
+- An avg. order waits 5.05 seconds to be prepared
+- An avg. order waits 119.30 seconds to be assembled
 --> The primary bottleneck is the Assembly Station (burgermaster).
 
 Q2: How long does the average lunch break last at counter 3?
 The average time to clear all orders is 3.51 hours (12638.59 seconds).
 
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 27.97% idle time.
-- Burger Chef (Assembly): 14.47% idle time.
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 27.97% idle time.
+- Burgermaster (Assembly): 14.47% idle time.
 
 Q4: How long do students wait on average for their burgers?
 Students wait on average -0.72 minutes (-43.08 seconds).
----------------- END OF RUN ---------------- 
 
-Running 500 simulations using 6 linecooks and 2 assemblers.
-
-Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 5.29 seconds
-- Avg. Wait for Assembly: 0.32 seconds
---> The primary bottleneck is the Prep Station (linecooks).
-
-Q2: How long does the average lunch break last at counter 3?
-The average time to clear all orders is 3.46 hours (12454.05 seconds).
-
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 26.89% idle time.
-- Burger Chef (Assembly): 56.59% idle time.
-
-Q4: How long do students wait on average for their burgers?
-Students wait on average -2.81 minutes (-168.66 seconds).
----------------- END OF RUN ---------------- 
-
-Running 500 simulations using 5 linecooks and 2 assemblers.
-
-Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 127.46 seconds
-- Avg. Wait for Assembly: 0.30 seconds
---> The primary bottleneck is the Prep Station (linecooks).
-
-Q2: How long does the average lunch break last at counter 3?
-The average time to clear all orders is 3.46 hours (12468.94 seconds).
-
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 12.39% idle time.
-- Burger Chef (Assembly): 56.66% idle time.
-
-Q4: How long do students wait on average for their burgers?
-Students wait on average -2.68 minutes (-160.90 seconds).
----------------- END OF RUN ---------------- 
-
-Running 500 simulations using 4 linecooks and 2 assemblers.
-
-Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 1259.09 seconds
-- Avg. Wait for Assembly: 2.14 seconds
---> The primary bottleneck is the Prep Station (linecooks).
-
-Q2: How long does the average lunch break last at counter 3?
-The average time to clear all orders is 3.94 hours (14177.68 seconds).
-
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 3.63% idle time.
-- Burger Chef (Assembly): 61.80% idle time.
-
-Q4: How long do students wait on average for their burgers?
-Students wait on average 6.54 minutes (392.38 seconds).
+The average burger takes 29.28 minutes (1756.92 seconds) to process from receiving the order to finish packaging.
 ---------------- END OF RUN ---------------- 
 
 Running 500 simulations using 2 linecooks and 2 assemblers.
 
 Q1: Which areas of work lead to bottlenecks?
-- Avg. Wait for Prep: 7655.95 seconds
-- Avg. Wait for Assembly: 0.00 seconds
+- An avg. order waits 7655.95 seconds to be prepared
+- An avg. order waits 0.00 seconds to be assembled
 --> The primary bottleneck is the Prep Station (linecooks).
 
 Q2: How long does the average lunch break last at counter 3?
 The average time to clear all orders is 7.67 hours (27607.91 seconds).
 
-Q3: How much idle time do the assistants and the burger chef have on average?
-- Assistants (Prep): 1.09% idle time.
-- Burger Chef (Assembly): 80.43% idle time.
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 1.09% idle time.
+- Burgermaster (Assembly): 80.43% idle time.
 
 Q4: How long do students wait on average for their burgers?
 Students wait on average 115.47 minutes (6928.18 seconds).
+
+The average burger takes 145.47 minutes (8728.18 seconds) to process from receiving the order to finish packaging.
+---------------- END OF RUN ---------------- 
+
+Running 500 simulations using 4 linecooks and 2 assemblers.
+
+Q1: Which areas of work lead to bottlenecks?
+- An avg. order waits 1259.09 seconds to be prepared
+- An avg. order waits 2.14 seconds to be assembled
+--> The primary bottleneck is the Prep Station (linecooks).
+
+Q2: How long does the average lunch break last at counter 3?
+The average time to clear all orders is 3.94 hours (14177.68 seconds).
+
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 3.63% idle time.
+- Burgermaster (Assembly): 61.80% idle time.
+
+Q4: How long do students wait on average for their burgers?
+Students wait on average 6.54 minutes (392.38 seconds).
+
+The average burger takes 36.54 minutes (2192.38 seconds) to process from receiving the order to finish packaging.
+---------------- END OF RUN ---------------- 
+
+Running 500 simulations using 5 linecooks and 2 assemblers.
+
+Q1: Which areas of work lead to bottlenecks?
+- An avg. order waits 127.46 seconds to be prepared
+- An avg. order waits 0.30 seconds to be assembled
+--> The primary bottleneck is the Prep Station (linecooks).
+
+Q2: How long does the average lunch break last at counter 3?
+The average time to clear all orders is 3.46 hours (12468.94 seconds).
+
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 12.39% idle time.
+- Burgermaster (Assembly): 56.66% idle time.
+
+Q4: How long do students wait on average for their burgers?
+Students wait on average -2.68 minutes (-160.90 seconds).
+
+The average burger takes 27.32 minutes (1639.10 seconds) to process from receiving the order to finish packaging.
+---------------- END OF RUN ---------------- 
+
+Running 500 simulations using 6 linecooks and 2 assemblers.
+
+Q1: Which areas of work lead to bottlenecks?
+- An avg. order waits 5.29 seconds to be prepared
+- An avg. order waits 0.32 seconds to be assembled
+--> The primary bottleneck is the Prep Station (linecooks).
+
+Q2: How long does the average lunch break last at counter 3?
+The average time to clear all orders is 3.46 hours (12454.05 seconds).
+
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 26.89% idle time.
+- Burgermaster (Assembly): 56.59% idle time.
+
+Q4: How long do students wait on average for their burgers?
+Students wait on average -2.81 minutes (-168.66 seconds).
+
+The average burger takes 27.19 minutes (1631.34 seconds) to process from receiving the order to finish packaging.
 ---------------- END OF RUN ---------------- 
 
