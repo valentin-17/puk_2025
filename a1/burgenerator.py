@@ -1,4 +1,4 @@
-"""
+'''
 Planning and Configuration: Practical Task 1
 
 Scenario:
@@ -24,7 +24,7 @@ Implementation Details:
   Gemini CLI has also been used to implement an elegant logging solution of simulation statistics during the simulation
   runs, since my experience with these datastructures is limited. The benefit was a very fast development of the
   otherwise tedious overhead of logging such that I was able to focus my time on the actual simulation implementation.
-"""
+'''
 import random
 from collections import defaultdict
 
@@ -39,16 +39,17 @@ GEN = np.random.default_rng(c.SEED)
 
 
 class Burgenerator:
-    """Holds the metadata for Theke 3 during a simulation run."""
+    '''Holds the metadata for Theke 3 during a simulation run.'''
     def __init__(self, env: simpy.Environment):
         self.env = env
         self.prep: simpy.Resource = simpy.Resource(env, capacity=c.N_LINECOOKS)
         self.assembly: simpy.Resource = simpy.Resource(env, capacity=c.N_ASSEMBLERS)
         self.usage_stats: defaultdict[str, list] = defaultdict(list)
         self.order_stats: defaultdict[str, list] = defaultdict(list)
+        self.timeline_events = []
 
     def prepare(self):
-        # we can assume that the prep_time is always freezer prep time and warm prep time since every burger has to have
+        # we can assume that the prep_time is always freezer prep time + warm prep time since every burger has to have
         # at least one patty. the prep time is then independent of the total amount of warm ingredients.
         prep_time = (GEN.gamma(c.FREEZER_PREP_TIME_SHAPE, c.FREEZER_PREP_TIME_SCALE)
                      + GEN.uniform(c.WARM_PROCESSING_TIME_LOW, c.WARM_PROCESSING_TIME_HIGH))
@@ -74,20 +75,21 @@ class Burgenerator:
         return packing_time
 
 def _incoming_orders(env, burgenerator):
-    """Generates orders from SIM_START until SIM_END."""
+    '''Generates orders from SIM_START until SIM_END.'''
     order_window = c.SIM_END - c.SIM_START
+    order_id = 0
     while env.now < order_window:
         burger = _sample_burger()
-        env.process(_burger_process(env, burgenerator, burger))
+        env.process(_burger_process(env, burgenerator, burger, order_id))
         order_downtime = int(GEN.normal(c.TIME_BETWEEN_ARRIVALS_MEAN, c.TIME_BETWEEN_ARRIVALS_SCALE))
-
+        order_id += 1
         yield env.timeout(max(0, order_downtime))
 
 def _sample_burger():
-    """
+    '''
     Samples a random burger with MIN_INGREDIENTS and MAX_INGREDIENTS and at least one bun and one patty. Invalid burgers
     are immediately rejected.
-    """
+    '''
     while True:
         burger = {
             'bun': np.random.binomial(c.BUN_N, c.BUN_P),
@@ -106,7 +108,7 @@ def _sample_burger():
                 burger['patty'] > 0):
             return burger
 
-def _burger_process(env, burgenerator, burger):
+def _burger_process(env, burgenerator, burger, order_id):
     order_time = env.now
     pickup_time = order_time + c.PICKUP_DELAY
     rework_count = 0
@@ -116,21 +118,66 @@ def _burger_process(env, burgenerator, burger):
         prep_wait_start = env.now
         with burgenerator.prep.request() as req:
             yield req
-            burgenerator.usage_stats['prep_wait'].append(env.now - prep_wait_start)
+            prep_wait_end = env.now
+            burgenerator.timeline_events.append({
+                'order_id': order_id,
+                'stage': 'prep_wait',
+                'start': prep_wait_start,
+                'end': prep_wait_end,
+                'resource': 'prep_station'
+            })
+            burgenerator.usage_stats['prep_wait'].append(prep_wait_end - prep_wait_start)
+
+            prep_start = env.now
             prep_duration = yield env.process(burgenerator.prepare())
+            prep_end = env.now
+            burgenerator.timeline_events.append({
+                'order_id': order_id,
+                'stage': 'prep',
+                'start': prep_start,
+                'end': prep_end,
+                'resource': 'prep_station'
+            })
             burgenerator.usage_stats['prep_work'].append(prep_duration)
 
         # if the pickup time is more than 5 minutes in the future don't start the burger
         if env.now < pickup_time - 300:
+            assembly_wait_to_begin_start = env.now
             dt = (pickup_time - 300) - env.now
             burgenerator.usage_stats['assembly_wait_to_begin'].append(dt)
             yield env.timeout(dt)
+            assembly_wait_to_begin_end = env.now
+            burgenerator.timeline_events.append({
+                'order_id': order_id,
+                'stage': 'assembly_wait_to_begin',
+                'start': assembly_wait_to_begin_start,
+                'end': assembly_wait_to_begin_end,
+                'resource': 'assembly'
+            })
 
         assembly_wait_start = env.now
         with burgenerator.assembly.request() as req:
             yield req
-            burgenerator.usage_stats['assembly_wait'].append(env.now - assembly_wait_start)
+            assembly_wait_end = env.now
+            burgenerator.timeline_events.append({
+                'order_id': order_id,
+                'stage': 'assembly_wait',
+                'start': assembly_wait_start,
+                'end': assembly_wait_end,
+                'resource': 'assembly'
+            })
+            burgenerator.usage_stats['assembly_wait'].append(assembly_wait_end - assembly_wait_start)
+
+            assembly_start = env.now
             assembly_duration = yield env.process(burgenerator.assemble(burger))
+            assembly_end = env.now
+            burgenerator.timeline_events.append({
+                'order_id': order_id,
+                'stage': 'assembly_work',
+                'start': assembly_start,
+                'end': assembly_end,
+                'resource': 'assembly'
+            })
             burgenerator.usage_stats['assembly_work'].append(assembly_duration)
 
             # after assembling, errors can be found with a 5% chance
@@ -140,7 +187,16 @@ def _burger_process(env, burgenerator, burger):
                 # such that the failed burger gets remade immediately
                 continue
             else:
+                packing_start = env.now
                 packing_duration = yield env.process(burgenerator.package())
+                packing_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'assembly_packing',
+                    'start': packing_start,
+                    'end': packing_end,
+                    'resource': 'assembly'
+                })
                 burgenerator.usage_stats['assembly_work'].append(packing_duration)
                 # if the burger is assembled successfully we can break out of the loop
                 break
@@ -152,8 +208,8 @@ def _analyze_results(burgenerator):
     stats = {}
     total_time = burgenerator.env.now
 
-    stats['avg_prep_wait'] = np.mean(burgenerator.usage_stats['prep_wait'])
-    stats['avg_assembly_wait'] = np.mean(burgenerator.usage_stats['assembly_wait'])
+    stats['avg_prep_wait'] = np.mean(burgenerator.usage_stats['prep_wait']) if burgenerator.usage_stats['prep_wait'] else 0
+    stats['avg_assembly_wait'] = np.mean(burgenerator.usage_stats['assembly_wait']) if burgenerator.usage_stats['assembly_wait'] else 0
     stats['total_sim_duration'] = total_time
     total_prep_work = np.sum(burgenerator.usage_stats['prep_work'])
     total_assembly_work = np.sum(burgenerator.usage_stats['assembly_work'])
@@ -162,7 +218,7 @@ def _analyze_results(burgenerator):
     total_assembly_time_available = c.N_ASSEMBLERS * total_time
     stats['prep_idle_percent'] = (1 - (total_prep_occupied / total_prep_time_available)) * 100
     stats['assembly_idle_percent'] = (1 - (total_assembly_work / total_assembly_time_available)) * 100
-    stats['avg_student_wait'] = np.mean(burgenerator.order_stats['total_time']) - c.PICKUP_DELAY # we have to deduct the pickup delay here to get the true wait time on a burger
+    stats['avg_student_wait'] = np.mean(burgenerator.order_stats['total_time']) - c.PICKUP_DELAY if burgenerator.order_stats['total_time'] else 0 # we have to deduct the pickup delay here to get the true wait time on a burger
 
     return stats
 
@@ -176,39 +232,46 @@ def run_single_simulation(seed):
     env.process(_incoming_orders(env, burgenerator))
     env.run()
 
-    return _analyze_results(burgenerator)
+    return burgenerator
+
+def log_print(*args, **kwargs):
+    message = ' '.join(str(a) for a in args)
+    with open('simlog.txt', 'a') as f:
+        f.write(message + ('\n' if not kwargs.get('end') else ''))
+    print(*args, **kwargs)
 
 def run_simulations():
-    print(f"Running {c.N_SIMS} simulations...")
+    log_print(f'Running {c.N_SIMS} simulations using {c.N_LINECOOKS} linecooks and {c.N_ASSEMBLERS} assemblers.')
     all_results = []
     for i in range(c.N_SIMS):
         seed = c.SEED + i
-        all_results.append(run_single_simulation(seed))
-        print(f"  Simulation {i + 1}/{c.N_SIMS} complete.",end='\r')
-    print("\n\n--- Simulation Analysis Complete ---")
+        burgenerator = run_single_simulation(seed)
+        all_results.append(_analyze_results(burgenerator))
 
     df = pd.DataFrame(all_results)
 
     avg_prep_wait = df['avg_prep_wait'].mean()
     avg_assembly_wait = df['avg_assembly_wait'].mean()
-    bottleneck = "Prep Station (Line Cooks)" if avg_prep_wait > avg_assembly_wait else "Assembly Station (Burger Chef)"
-    print("\n1. Which areas of work lead to bottlenecks?")
-    print(f"- Avg. Wait for Prep: {avg_prep_wait:.2f} seconds")
-    print(f"- Avg. Wait for Assembly: {avg_assembly_wait:.2f} seconds")
-    print(f"--> The primary bottleneck is the {bottleneck}.")
+    bottleneck = 'Prep Station (linecooks)' if avg_prep_wait > avg_assembly_wait else 'Assembly Station (burgermaster)'
+    log_print('\nQ1: Which areas of work lead to bottlenecks?')
+    log_print(f'- Avg. Wait for Prep: {avg_prep_wait:.2f} seconds')
+    log_print(f'- Avg. Wait for Assembly: {avg_assembly_wait:.2f} seconds')
+    log_print(f'--> The primary bottleneck is the {bottleneck}.')
 
     avg_lunch_break = df['total_sim_duration'].mean()
-    print(f"\n2. How long does the average lunch break last at counter 3?")
-    print(f"The average time to clear all orders is {avg_lunch_break / 3600:.2f} hours ({avg_lunch_break:.2f} seconds).")
+    log_print(f'\nQ2: How long does the average lunch break last at counter 3?')
+    log_print(f'The average time to clear all orders is {avg_lunch_break / 3600:.2f} hours ({avg_lunch_break:.2f} seconds).')
 
     avg_prep_idle = df['prep_idle_percent'].mean()
     avg_assembly_idle = df['assembly_idle_percent'].mean()
-    print("\n3. How much idle time do the assistants and the burger chef have on average?")
-    print(f"- Assistants (Prep): {avg_prep_idle:.2f}% idle time.")
-    print(f"- Burger Chef (Assembly): {avg_assembly_idle:.2f}% idle time.")
+    log_print('\nQ3: How much idle time do the assistants and the burger chef have on average?')
+    log_print(f'- Assistants (Prep): {avg_prep_idle:.2f}% idle time.')
+    log_print(f'- Burger Chef (Assembly): {avg_assembly_idle:.2f}% idle time.')
 
     avg_student_wait = df['avg_student_wait'].mean()
-    print(f"\n4. How long do students wait on average for their burgers?")
-    print(f"Students wait on average {avg_student_wait / 60:.2f} minutes ({avg_student_wait:.2f} seconds).")
+    log_print(f'\nQ4: How long do students wait on average for their burgers?')
+    log_print(f'Students wait on average {avg_student_wait / 60:.2f} minutes ({avg_student_wait:.2f} seconds).')
+    log_print('-' * 16, 'END OF RUN', '-' * 16, '\n')
+
 if __name__ == '__main__':
     run_simulations()

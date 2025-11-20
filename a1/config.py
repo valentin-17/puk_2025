@@ -23,6 +23,7 @@ SEED = 42
 # Timings in seconds
 SIM_START = 11 * 3600 # 11 hours * 3600 seconds/hour
 SIM_END = 14 * 3600
+ORDER_TIME = 3 * 3600 # time to place orders is 3 hours
 
 PICKUP_DELAY = 0.5 * 3600 # half an hour
 
@@ -41,8 +42,8 @@ PACKING_TIME_FRIES_LOW = 15
 PACKING_TIME_FRIES_HIGH = 30
 
 # Other params
-N_LINECOOKS = 2
-N_ASSEMBLERS = 1
+N_LINECOOKS = 5
+N_ASSEMBLERS = 2
 
 MIN_INGREDIENTS = 2
 MAX_INGREDIENTS = 20
@@ -50,4 +51,4 @@ MAX_INGREDIENTS = 20
 FAIL_PROB = 0.05
 FRIES_PROB = 0.5
 
-N_SIMS = 100
+N_SIMS = 500
