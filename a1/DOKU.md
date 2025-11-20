@@ -1,5 +1,5 @@
-Frame
--
+# Framework
+## Task 1
 - Timespan *11:30 - 14:30*
 - Burger can be ordered between *11:00 and 14:00*
 - Pick up is exactly *30 minutes after order*
@@ -17,6 +17,14 @@ Frame
 - If fries are ordered packing takes *Uniform(15, 30)*
 - Fries are always ready to pack and do not have to be prepared
 - Received orders are fulfilled in the same Timespan (i.e. on the same day)
+## Task 2
+- There is only 1 helper, The helper is not a linecook
+- The helper can only carry 1 ingredient per trip
+- A trip takes *Normal(mean=3x60, scale=0.5x60)* seconds
+- The finite bins at prep and assembly station have 30 slots
+- The s,Q policy has a safety threshold of 15%
+- The s,Q policy has a notification threshold of 30%
+- The order quantity is the delta missing in a bin (i.e. bin.max - bin.current)
 
 # How the task has been tackled
 ## Finding distributions
