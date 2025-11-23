@@ -30,6 +30,7 @@ class Burgenerator:
         self.helper: simpy.Resource = simpy.Resource(env, capacity=c.N_HELPERS)
         self.container: dict[str, simpy.Container] = {container: simpy.Container(
             env, capacity=c.CONTAINER_SIZE, init=c.CONTAINER_SIZE) for container in c.CONTAINERS}
+        self.pending_refill = set()
         self.usage_stats: defaultdict[str, list] = defaultdict(list)
         self.order_stats: defaultdict[str, list] = defaultdict(list)
         self.timeline_events = []
@@ -44,7 +45,6 @@ class Burgenerator:
             amount = burger.get(warm_ingredient)
             if amount < 1:
                 continue
-            log_print(f'Removing {amount} {warm_ingredient}.')
             yield self.container[warm_ingredient].get(amount)
 
         prep_time = GEN.gamma(c.FREEZER_PREP_TIME_SHAPE, c.FREEZER_PREP_TIME_SCALE)
@@ -57,19 +57,19 @@ class Burgenerator:
         yield self.env.timeout(grill_time)
         return grill_time
 
-    def refill(self, name: str):
+    def refill(self, name: str, amount: int):
+        # lock the container so that it does not send extra calls to be refilled all the time
+        self.pending_refill.add(name)
         with self.helper.request() as req:
             yield req
 
             refill_time = GEN.normal(c.REFILL_TIME_MEAN, c.REFILL_TIME_SCALE)
-            log_print(f'{self.env.now:8.2f}: refill({name}) refill_time={refill_time}')
             yield self.env.timeout(refill_time)
 
-            container = self.container[name]
-            amount = max(0, container.capacity - container.level)
-            log_print(f'{self.env.now:8.2f}: refill({name}) recalculated amount={amount}')
+            log_print(f'{self.env.now:8.2f}: refill({name}) amount={amount}')
             yield self.container[name].put(amount)
             log_print(f'{self.env.now:8.2f}: refilled {amount} items for container {name}.')
+            self.pending_refill.discard(name)
 
             return refill_time
 
@@ -82,7 +82,6 @@ class Burgenerator:
             amount = burger.get(cold_ingredient)
             if amount < 1:
                 continue
-            log_print(f'Removing {amount} {cold_ingredient}.')
             yield self.container[cold_ingredient].get(amount)
 
         assembly_time = (c.TOASTING_TIME
@@ -114,17 +113,21 @@ def _container_monitor(env, burgenerator):
         reorder_threshold = c.CONTAINER_SIZE * c.REORDER_THRESHOLD
 
         for name in burgenerator.container:
+            if name in burgenerator.pending_refill:
+                continue
+
             container = burgenerator.container[name]
 
             if container.level < reorder_threshold:
+                amount = container.capacity - container.level
                 log_print(f'{env.now:8.2f}: {name} container at {container.level} items, refill requested.')
-                env.process(burgenerator.refill(name))
+                env.process(burgenerator.refill(name, amount))
 
         # checks for refill every simulation step (every second). this simulates asap refill of any container thats
         # running low on stock, could be tweaked to make the simulation a bit less expensive, less checking does not
         # change anything as there is only one helper that can only grab one ingredient at a time so no batched
         # refill is possible
-        yield env.timeout(10)
+        yield env.timeout(1)
 
 def _sample_burger() -> dict[str, int]:
     """Samples a random burger with MIN_INGREDIENTS and MAX_INGREDIENTS and at least one bun and one patty. Invalid burgers
@@ -148,7 +151,7 @@ def _sample_burger() -> dict[str, int]:
             return burger
 
 def _burger_process(env, burgenerator, burger, order_id):
-    """Simulates a order process from incoming order to finished burger. This method uses the burgenerator class as the
+    """Simulates an order process from incoming order to finished burger. This method uses the burgenerator class as the
     environment (i.e. Theke 3) in which the tasks are done. The individual tasks are modeled in the burgenerator class
     while inter-task activities like the failure of assembly or the wait to start the assembly are modeled here in this
     method. Further various timings and statistics are tracked to allow for later analysis."""
@@ -276,7 +279,8 @@ def run_single_simulation(seed):
 
     env.process(_container_monitor(env, burgenerator))
     env.process(_incoming_orders(env, burgenerator))
-    env.run()
+    env.run(until=3 * c.ORDER_TIME) # do have to cut the sim after 3x order time because somehow the helper resources or
+    # the container refills do not get released properly after the order window is finished
 
     return burgenerator
 
