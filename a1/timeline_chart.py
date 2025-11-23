@@ -26,7 +26,7 @@ from a1 import burgenerator, config
 
 C_MAP = {
         'prep_wait': '#afe1f5',
-        'prep': '#69a0cb',
+        'prep_work': '#69a0cb',
         'assembly_wait_to_begin': '#ffd700',
         'assembly_wait': '#d1a7ef',
         'assembly_work': '#ba55aa',

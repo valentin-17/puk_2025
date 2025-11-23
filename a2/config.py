@@ -40,10 +40,13 @@ PACKING_TIME_LOW = 10
 PACKING_TIME_HIGH = 20
 PACKING_TIME_FRIES_LOW = 15
 PACKING_TIME_FRIES_HIGH = 30
+REFILL_TIME_MEAN = 3 * 60 # given minutes scale, needs transform into seconds scale
+REFILL_TIME_SCALE = 0.5 * 60 # given minutes scale, needs transform into seconds scale
 
 # Other params
 N_LINECOOKS = 2
 N_ASSEMBLERS = 1
+N_HELPERS = 1
 
 MIN_INGREDIENTS = 2
 MAX_INGREDIENTS = 20
@@ -51,4 +54,12 @@ MAX_INGREDIENTS = 20
 FAIL_PROB = 0.05
 FRIES_PROB = 0.5
 
-N_SIMS = 500
+SAFETY_STOCK_THRESHOLD = 0.15
+REORDER_THRESHOLD = 0.3
+
+N_SIMS = 1
+
+CONTAINERS = ['bun', 'patty', 'bacon', 'salad', 'cheese', 'vegetables']
+CONTAINER_SIZE = 30
+WARM_INGREDIENTS = ['patty', 'bacon']
+COLD_INGREDIENTS = ['bun', 'salad', 'cheese', 'vegetables']

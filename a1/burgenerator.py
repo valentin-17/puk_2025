@@ -142,7 +142,7 @@ def _burger_process(env, burgenerator, burger, order_id):
                 prep_end = env.now
                 burgenerator.timeline_events.append({
                     'order_id': order_id,
-                    'stage': 'prep',
+                    'stage': 'prep_work',
                     'start': prep_start,
                     'end': prep_end,
                     'resource': 'prep_station'

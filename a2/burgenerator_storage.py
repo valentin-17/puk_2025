@@ -8,8 +8,6 @@ Scenario:
 
 Implementation Details:
   This implementation is an extension of the implementation from task 1.
-
-Insights:
 """
 from collections import defaultdict
 
@@ -17,7 +15,7 @@ import numpy as np
 import pandas as pd
 import simpy
 
-import a1.config as c
+import a2.config as c
 
 
 GEN = np.random.default_rng(c.SEED)
@@ -30,15 +28,25 @@ class Burgenerator:
         self.prep: simpy.Resource = simpy.Resource(env, capacity=c.N_LINECOOKS)
         self.assembly: simpy.Resource = simpy.Resource(env, capacity=c.N_ASSEMBLERS)
         self.helper: simpy.Resource = simpy.Resource(env, capacity=c.N_HELPERS)
+        self.container: dict[str, simpy.Container] = {container: simpy.Container(
+            env, capacity=c.CONTAINER_SIZE, init=c.CONTAINER_SIZE) for container in c.CONTAINERS}
         self.usage_stats: defaultdict[str, list] = defaultdict(list)
         self.order_stats: defaultdict[str, list] = defaultdict(list)
         self.timeline_events = []
 
-    def prepare(self):
+
+    def prepare(self, burger: dict[str, int]):
         # we can assume that the prep_time is only freezer prep time since the linecook takes the ingredients from the
         # freezer, puts them on the grill and then can move on to the next order. for simplicity’s sake we assume that
         # the grill always has enough space for the next patty. the prep time is then independent of the total amount of
         # warm ingredients.
+        for warm_ingredient in c.WARM_INGREDIENTS:
+            amount = burger.get(warm_ingredient)
+            if amount < 1:
+                continue
+            log_print(f'Removing {amount} {warm_ingredient}.')
+            yield self.container[warm_ingredient].get(amount)
+
         prep_time = GEN.gamma(c.FREEZER_PREP_TIME_SHAPE, c.FREEZER_PREP_TIME_SCALE)
         yield self.env.timeout(prep_time)
         grill_event = self.env.process(self.grill())
@@ -49,21 +57,46 @@ class Burgenerator:
         yield self.env.timeout(grill_time)
         return grill_time
 
-    def refill(self):
-        refill_time = GEN.normal(c.REFILL_TIME_MEAN, c.REFILL_TIME_SCALE)
-        yield self.env.timeout(refill_time)
-        return refill_time
+    def refill(self, name: str):
+        with self.helper.request() as req:
+            yield req
+
+            refill_time = GEN.normal(c.REFILL_TIME_MEAN, c.REFILL_TIME_SCALE)
+            log_print(f'{self.env.now:8.2f}: refill({name}) refill_time={refill_time}')
+            yield self.env.timeout(refill_time)
+
+            container = self.container[name]
+            amount = max(0, container.capacity - container.level)
+            log_print(f'{self.env.now:8.2f}: refill({name}) recalculated amount={amount}')
+            yield self.container[name].put(amount)
+            log_print(f'{self.env.now:8.2f}: refilled {amount} items for container {name}.')
+
+            return refill_time
 
     def assemble(self, burger, grill_event):
         # only count assembly time for the cold ingredients plus the toasting time, buns are also not considered a cold
         # ingredient as they have the 40-second toasting time
         yield grill_event
+
+        for cold_ingredient in c.COLD_INGREDIENTS:
+            amount = burger.get(cold_ingredient)
+            if amount < 1:
+                continue
+            log_print(f'Removing {amount} {cold_ingredient}.')
+            yield self.container[cold_ingredient].get(amount)
+
         assembly_time = (c.TOASTING_TIME
                          + (GEN.normal(c.ASSEMBLY_TIME_PER_INGREDIENT_MEAN, c.ASSEMBLY_TIME_PER_INGREDIENT_SCALE)
                             * sum(v for k, v in burger.items() if k not in ['bun', 'patty', 'bacon'])))
         yield self.env.timeout(assembly_time)
         return assembly_time
 
+    def package(self):
+        packing_time = GEN.uniform(c.PACKING_TIME_LOW, c.PACKING_TIME_HIGH)
+        if GEN.random() < c.FRIES_PROB:
+            packing_time += GEN.uniform(c.PACKING_TIME_FRIES_LOW, c.PACKING_TIME_FRIES_HIGH)
+        yield self.env.timeout(packing_time)
+        return packing_time
 
 def _incoming_orders(env, burgenerator):
     """Generates orders from SIM_START until SIM_END."""
@@ -76,7 +109,24 @@ def _incoming_orders(env, burgenerator):
         order_id += 1
         yield env.timeout(max(0, order_downtime))
 
-def _sample_burger():
+def _container_monitor(env, burgenerator):
+    while True:
+        reorder_threshold = c.CONTAINER_SIZE * c.REORDER_THRESHOLD
+
+        for name in burgenerator.container:
+            container = burgenerator.container[name]
+
+            if container.level < reorder_threshold:
+                log_print(f'{env.now:8.2f}: {name} container at {container.level} items, refill requested.')
+                env.process(burgenerator.refill(name))
+
+        # checks for refill every simulation step (every second). this simulates asap refill of any container thats
+        # running low on stock, could be tweaked to make the simulation a bit less expensive, less checking does not
+        # change anything as there is only one helper that can only grab one ingredient at a time so no batched
+        # refill is possible
+        yield env.timeout(10)
+
+def _sample_burger() -> dict[str, int]:
     """Samples a random burger with MIN_INGREDIENTS and MAX_INGREDIENTS and at least one bun and one patty. Invalid burgers
     are immediately rejected."""
     while True:
@@ -102,100 +152,101 @@ def _burger_process(env, burgenerator, burger, order_id):
     environment (i.e. Theke 3) in which the tasks are done. The individual tasks are modeled in the burgenerator class
     while inter-task activities like the failure of assembly or the wait to start the assembly are modeled here in this
     method. Further various timings and statistics are tracked to allow for later analysis."""
-    order_time = env.now
-    pickup_time = order_time + c.PICKUP_DELAY
-    rework_count = 0
-
-    #print(f'Order received with {sum(burger.values()):<2} ingredients: {burger}')
     while True:
-        prep_wait_start = env.now
-        with burgenerator.prep.request() as req:
-            yield req
-            prep_wait_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'prep_wait',
-                'start': prep_wait_start,
-                'end': prep_wait_end,
-                'resource': 'prep_station'
-            })
-            burgenerator.usage_stats['prep_wait'].append(prep_wait_end - prep_wait_start)
+        order_time = env.now
+        pickup_time = order_time + c.PICKUP_DELAY
+        rework_count = 0
 
-            prep_start = env.now
-            prep_duration, grill_event = yield env.process(burgenerator.prepare())
-            prep_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'prep',
-                'start': prep_start,
-                'end': prep_end,
-                'resource': 'prep_station'
-            })
-            burgenerator.usage_stats['prep_work'].append(prep_duration)
-
-        # if the pickup time is more than 5 minutes in the future don't start the burger
-        if env.now < pickup_time - 300:
-            assembly_wait_to_begin_start = env.now
-            dt = (pickup_time - 300) - env.now
-            burgenerator.usage_stats['assembly_wait_to_begin'].append(dt)
-            yield env.timeout(dt)
-            assembly_wait_to_begin_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'assembly_wait_to_begin',
-                'start': assembly_wait_to_begin_start,
-                'end': assembly_wait_to_begin_end,
-                'resource': 'assembly'
-            })
-
-        assembly_wait_start = env.now
-        with burgenerator.assembly.request() as req:
-            yield req
-            assembly_wait_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'assembly_wait',
-                'start': assembly_wait_start,
-                'end': assembly_wait_end,
-                'resource': 'assembly'
-            })
-            burgenerator.usage_stats['assembly_wait'].append(assembly_wait_end - assembly_wait_start)
-
-            assembly_start = env.now
-            assembly_duration = yield env.process(burgenerator.assemble(burger, grill_event))
-            assembly_end = env.now
-            burgenerator.timeline_events.append({
-                'order_id': order_id,
-                'stage': 'assembly_work',
-                'start': assembly_start,
-                'end': assembly_end,
-                'resource': 'assembly'
-            })
-            burgenerator.usage_stats['assembly_work'].append(assembly_duration)
-
-            # after assembling, errors can be found with a 5% chance
-            if GEN.random() < c.FAIL_PROB:
-                rework_count += 1
-                # if burger assembly fails re-enter the loop once more
-                # such that the failed burger gets remade immediately
-                continue
-            else:
-                packing_start = env.now
-                packing_duration = yield env.process(burgenerator.package())
-                packing_end = env.now
+        while True:
+            prep_wait_start = env.now
+            with burgenerator.prep.request() as req:
+                yield req
+                prep_wait_end = env.now
                 burgenerator.timeline_events.append({
                     'order_id': order_id,
-                    'stage': 'assembly_packing',
-                    'start': packing_start,
-                    'end': packing_end,
+                    'stage': 'prep_wait',
+                    'start': prep_wait_start,
+                    'end': prep_wait_end,
+                    'resource': 'prep_station'
+                })
+                burgenerator.usage_stats['prep_wait'].append(prep_wait_end - prep_wait_start)
+
+                prep_start = env.now
+                prep_duration, grill_event = yield env.process(burgenerator.prepare(burger))
+                prep_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'prep_work',
+                    'start': prep_start,
+                    'end': prep_end,
+                    'resource': 'prep_station'
+                })
+                burgenerator.usage_stats['prep_work'].append(prep_duration)
+
+            # if the pickup time is more than 5 minutes in the future don't start the burger
+            if env.now < pickup_time - 300:
+                assembly_wait_to_begin_start = env.now
+                dt = (pickup_time - 300) - env.now
+                burgenerator.usage_stats['assembly_wait_to_begin'].append(dt)
+                yield env.timeout(dt)
+                assembly_wait_to_begin_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'assembly_wait_to_begin',
+                    'start': assembly_wait_to_begin_start,
+                    'end': assembly_wait_to_begin_end,
                     'resource': 'assembly'
                 })
-                burgenerator.usage_stats['assembly_work'].append(packing_duration)
-                # if the burger is assembled successfully we can break out of the loop
-                break
 
-    burgenerator.order_stats['total_time'].append(env.now - order_time)
-    burgenerator.order_stats['num_reworks'].append(rework_count)
+            assembly_wait_start = env.now
+            with burgenerator.assembly.request() as req:
+                yield req
+                assembly_wait_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'assembly_wait',
+                    'start': assembly_wait_start,
+                    'end': assembly_wait_end,
+                    'resource': 'assembly'
+                })
+                burgenerator.usage_stats['assembly_wait'].append(assembly_wait_end - assembly_wait_start)
+
+                assembly_start = env.now
+                assembly_duration = yield env.process(burgenerator.assemble(burger, grill_event))
+                assembly_end = env.now
+                burgenerator.timeline_events.append({
+                    'order_id': order_id,
+                    'stage': 'assembly_work',
+                    'start': assembly_start,
+                    'end': assembly_end,
+                    'resource': 'assembly'
+                })
+                burgenerator.usage_stats['assembly_work'].append(assembly_duration)
+
+                # after assembling, errors can be found with a 5% chance
+                if GEN.random() < c.FAIL_PROB:
+                    rework_count += 1
+                    # if burger assembly fails re-enter the loop once more
+                    # such that the failed burger gets remade immediately
+                    continue
+                else:
+                    packing_start = env.now
+                    packing_duration = yield env.process(burgenerator.package())
+                    packing_end = env.now
+                    burgenerator.timeline_events.append({
+                        'order_id': order_id,
+                        'stage': 'assembly_packing',
+                        'start': packing_start,
+                        'end': packing_end,
+                        'resource': 'assembly'
+                    })
+                    burgenerator.usage_stats['assembly_work'].append(packing_duration)
+                    # if the burger is assembled successfully we can break out of the loop
+                    break
+
+        burgenerator.order_stats['total_time'].append(env.now - order_time)
+        burgenerator.order_stats['num_reworks'].append(rework_count)
+        break
 
 def _analyze_results(burgenerator):
     """Collects various statistics for a single simulation run."""
@@ -223,6 +274,7 @@ def run_single_simulation(seed):
     env = simpy.Environment()
     burgenerator = Burgenerator(env)
 
+    env.process(_container_monitor(env, burgenerator))
     env.process(_incoming_orders(env, burgenerator))
     env.run()
 
