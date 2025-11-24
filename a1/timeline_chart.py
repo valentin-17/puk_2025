@@ -128,5 +128,5 @@ if __name__ == '__main__':
     burgenerator_instance = burgenerator.run_single_simulation(seed=config.SEED)
     timeline_df = pd.DataFrame(burgenerator_instance.timeline_events)
 
-    create_gantt_chart(timeline_df.copy(), 'figures/gantt_chart_2_1.png')
-    create_resource_chart(timeline_df.copy(), 'figures/resource_chart_2_1.png')
+    create_gantt_chart(timeline_df.copy(), 'figures/gantt_chart_2_2.png')
+    create_resource_chart(timeline_df.copy(), 'figures/resource_chart_2_2.png')

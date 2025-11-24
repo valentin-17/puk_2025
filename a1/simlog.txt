@@ -18,3 +18,23 @@ Students wait on average 4.61 minutes (276.70 seconds).
 The average burger takes 34.61 minutes (2076.70 seconds) to process from receiving the order to finish packaging.
 ---------------- END OF RUN ---------------- 
 
+Running 500 simulations using 2 linecooks and 2 assemblers.
+
+Q1: Which areas of work lead to bottlenecks?
+- An avg. order waits 0.00 seconds to be prepared
+- An avg. order waits 15.04 seconds to be assembled
+--> The primary bottleneck is the Assembly Station (burgermaster).
+
+Q2: How long does the average lunch break last at counter 3?
+The average time to clear all orders is 3.46 hours (12454.24 seconds).
+
+Q3: How much idle time do the linecooks and the Burgermaster have on average?
+- Linecooks (Prep): 91.23% idle time.
+- Burgermaster (Assembly): 56.61% idle time.
+
+Q4: How long do students wait on average for their burgers?
+Students wait on average -2.58 minutes (-154.92 seconds).
+
+The average burger takes 27.42 minutes (1645.08 seconds) to process from receiving the order to finish packaging.
+---------------- END OF RUN ---------------- 
+
