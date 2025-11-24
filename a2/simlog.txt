@@ -1,31 +1,38 @@
-Running 1 simulations using 2 linecooks, 1 assemblers and 1 helpers.
+Running 500 simulations using 2 linecooks, 1 assemblers and 1 helpers.
 
 QA: Base scenario
-The average burger takes 30.51 minutes (1830.73 seconds) to process from receiving the order to finish packaging.
-The burger master experiences on average 0.00 seconds wait time for a container refill.
-There are on average 94 ingredients left over.
+    Safety Stock 15.0%, capacity 30:
+      - Average assembly wait time for refill: 0.27 seconds.
+      - Average process time: 35.28 minutes (2116.55 seconds).
+      - Average leftover ingredients: 115 units.
 
-QB: Various safety stocks
-  Safety Stock: 10.0%:
-    Average Assembly Wait Time: 0.58 seconds.
-    Average Process Time: 2087.45 seconds.
-  Safety Stock: 12.5%:
-    Average Assembly Wait Time: 2.36 seconds.
-    Average Process Time: 2120.95 seconds.
-  Safety Stock: 17.5%:
-    Average Assembly Wait Time: 0.81 seconds.
-    Average Process Time: 2486.80 seconds.
-  Safety Stock: 20.0%:
-    Average Assembly Wait Time: 0.81 seconds.
-    Average Process Time: 2486.80 seconds.
+QB: Various safety stocks, default container capacity (30 units)
+    Safety Stock 10.0%:
+      - Average assembly wait time for refill: 1.63 seconds.
+      - Average process time: 35.72 minutes (2143.42 seconds).
+      - Average leftover ingredients: 115 units.
+    Safety Stock 12.5%:
+      - Average assembly wait time for refill: 1.51 seconds.
+      - Average process time: 37.09 minutes (2225.17 seconds).
+      - Average leftover ingredients: 115 units.
+    Safety Stock 17.5%:
+      - Average assembly wait time for refill: 0.82 seconds.
+      - Average process time: 36.40 minutes (2183.88 seconds).
+      - Average leftover ingredients: 115 units.
+    Safety Stock 20.0%:
+      - Average assembly wait time for refill: 0.82 seconds.
+      - Average process time: 36.40 minutes (2183.88 seconds).
+      - Average leftover ingredients: 115 units.
 
-QC: Various container capacities
-  Container Capacity: 60 units:
-    Average Assembly Wait Time: 0.06 seconds.
-    Average Leftover Ingredients: 275 units.
-  Container Capacity: 90 units:
-    Average Assembly Wait Time: 0.00 seconds.
-    Average Leftover Ingredients: 383 units.
+QC: Various container capacities, default safety stock (15.0%)
+    Container Size 60:
+      - Average assembly wait time for refill: 0.05 seconds.
+      - Average process time: 34.79 minutes (2087.42 seconds).
+      - Average leftover ingredients: 233 units.
+    Container Size 90:
+      - Average assembly wait time for refill: 0.03 seconds.
+      - Average process time: 34.79 minutes (2087.51 seconds).
+      - Average leftover ingredients: 385 units.
 
 ---------------- END OF RUN ---------------- 
 

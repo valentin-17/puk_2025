@@ -57,7 +57,7 @@ FRIES_PROB = 0.5
 SAFETY_STOCK_THRESHOLD = 0.15
 REORDER_THRESHOLD = 0.3
 
-N_SIMS = 1
+N_SIMS = 500
 
 CONTAINERS = ['bun', 'patty', 'bacon', 'salad', 'cheese', 'vegetables']
 CONTAINER_SIZE = 30

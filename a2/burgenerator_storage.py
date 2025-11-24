@@ -7,7 +7,25 @@ Scenario:
   prep station as well as the assembly station. The helper can only carry one ingredient per trip.
 
 Implementation Details:
-  This implementation is an extension of the implementation from task 1.
+  This implementation is an extension of the implementation from task 1. Helpers are implemented as simpy.Resource while
+  the ingredient containers are modeled as simpy.Container. This allows the retrieving and adding from and to containers
+  by multiple resources (burgermaster/helpers).
+
+  To monitor the container fill level and effectively implement the s,Q policy a monitor method has been implemented that
+  periodically (every 10th step) checks the fill level of each container against the defined reorder threshold. Once the
+  reorder threshold of a container is reached the helper gets blocked to fetch the ingredients. During this time the
+  container remains free such that the burgermaster or linecooks can continue working on their orders. This is realistic
+  as they 'inform' the helper about a deminishing ingredient but as they have the reorder threshold as buffer they do not
+  immediately run out of ingredients.
+
+  This was kind of tricky to model the way I did here because I needed to guarantee that the monitor method knows when a
+  reordering has been called to not call a reordering in the next step. This has been solved by using a set
+  'pending_refills' that locks a container when it is in the process of being refilled. It is only locked for the request
+  of a refill. For other activities it remains 'free'.
+
+  Again Gemini CLI was used to assist in implementing this task. Especially all the logging and data collection have been
+  heavily supported by the coding agent. Here I also faced a lot more problems with the coding agent in comparison to task
+  1 as
 """
 from collections import defaultdict
 import subprocess
@@ -324,51 +342,98 @@ def log_print(*args, **kwargs):
         f.write(message + ('\n' if not kwargs.get('end') else ''))
     print(*args, **kwargs)
 
-def run_and_analyze_scenario(container_size=c.CONTAINER_SIZE, reorder_threshold=c.REORDER_THRESHOLD):
+def run_and_analyze_scenario(container_size=c.CONTAINER_SIZE, reorder_threshold=c.REORDER_THRESHOLD, return_levels=False):
     """Runs a set of simulations for a given scenario and returns aggregated results."""
     all_results = []
+    container_levels_for_first_run = None
     for i in range(c.N_SIMS):
         seed = c.SEED + i
         burgenerator = run_single_simulation(seed, container_size, reorder_threshold)
+        if i == 0 and return_levels:
+            container_levels_for_first_run = burgenerator.container_levels
         all_results.append(_analyze_results(burgenerator))
 
     df = pd.DataFrame(all_results)
 
-    return {
+    aggregated_results = {
+        'container_size': container_size,
         'avg_process_time_per_burger': df['avg_process_time_per_burger'].mean(),
         'avg_assembly_wait_time_for_refill': df['avg_assembly_wait_time_for_refill'].mean(),
         'avg_total_leftovers': df['total_leftover_ingredients'].mean(),
     }
 
+    if return_levels:
+        aggregated_results['container_levels'] = container_levels_for_first_run
+
+    return aggregated_results
+
+
+def run_and_collect_scenario_results(return_levels=False):
+    """Runs all scenarios and collects their results."""
+    all_scenario_results = []
+
+    # Baseline
+    baseline_results = run_and_analyze_scenario(reorder_threshold=c.REORDER_THRESHOLD, return_levels=return_levels)
+    all_scenario_results.append({
+        'name': 'Baseline',
+        'results': baseline_results,
+        'type': 'baseline'
+    })
+
+    # Thresholds
+    thresholds = [0.10, 0.125, 0.175, 0.20]
+    for thresh in thresholds:
+        results = run_and_analyze_scenario(reorder_threshold=thresh, return_levels=return_levels)
+        all_scenario_results.append({
+            'name': f'Safety Stock {thresh:.1%}',
+            'results': results,
+            'type': 'threshold'
+        })
+
+    # Capacities
+    capacities = [60, 90]
+    for cap in capacities:
+        results = run_and_analyze_scenario(container_size=cap, return_levels=return_levels)
+        all_scenario_results.append({
+            'name': f'Container Size {cap}',
+            'results': results,
+            'type': 'capacity'
+        })
+
+    return all_scenario_results
 
 def run_simulations():
     """Orchestrates simulations for different scenarios and prints the analysis."""
     log_print(f'Running {c.N_SIMS} simulations using {c.N_LINECOOKS} linecooks, {c.N_ASSEMBLERS} assemblers and {c.N_HELPERS} helpers.')
 
+    scenario_results = run_and_collect_scenario_results()
+
+    baseline_scenario = next(item for item in scenario_results if item["type"] == "baseline")
+    baseline_results = baseline_scenario['results']
+
     log_print('\nQA: Base scenario')
-    baseline_results = run_and_analyze_scenario(reorder_threshold=c.REORDER_THRESHOLD)
-    avg_process_time_per_burger = baseline_results['avg_process_time_per_burger'].mean()
-    log_print(f'The average burger takes {avg_process_time_per_burger / 60:.2f} minutes '
-              f'({avg_process_time_per_burger:.2f} seconds) to process from receiving the order to finish packaging.')
-    log_print(f'The burger master experiences on average {baseline_results['avg_assembly_wait_time_for_refill']:.2f} '
-              f'seconds wait time for a container refill.')
-    log_print(f'There are on average {int(baseline_results['avg_total_leftovers'])} ingredients left over.')
+    log_print(f'    Safety Stock {c.SAFETY_STOCK_THRESHOLD:.1%}, capacity {c.CONTAINER_SIZE}:')
+    log_print(f'      - Average assembly wait time for refill: {baseline_results['avg_assembly_wait_time_for_refill']:.2f} seconds.')
+    log_print(f'      - Average process time: {baseline_results['avg_process_time_per_burger'] / 60:.2f} minutes ({baseline_results['avg_process_time_per_burger']:.2f} seconds).')
+    log_print(f'      - Average leftover ingredients: {int(baseline_results['avg_total_leftovers'])} units.')
 
-    log_print('\nQB: Various safety stocks')
-    thresholds = [0.10, 0.125, 0.175, 0.20]
-    for thresh in thresholds:
-        results = run_and_analyze_scenario(reorder_threshold=thresh)
-        log_print(f'  Safety Stock: {thresh:.1%}:')
-        log_print(f'    Average Assembly Wait Time: {results['avg_assembly_wait_time_for_refill']:.2f} seconds.')
-        log_print(f'    Average Process Time: {results['avg_process_time_per_burger']:.2f} seconds.')
+    log_print(f'\nQB: Various safety stocks, default container capacity ({c.CONTAINER_SIZE} units)')
+    threshold_scenarios = [item for item in scenario_results if item['type'] == 'threshold']
+    for scenario in threshold_scenarios:
+        results = scenario['results']
+        log_print(f'    {scenario['name']}:')
+        log_print(f'      - Average assembly wait time for refill: {results['avg_assembly_wait_time_for_refill']:.2f} seconds.')
+        log_print(f'      - Average process time: {results['avg_process_time_per_burger'] / 60:.2f} minutes ({results['avg_process_time_per_burger']:.2f} seconds).')
+        log_print(f'      - Average leftover ingredients: {int(baseline_results['avg_total_leftovers'])} units.')
 
-    log_print('\nQC: Various container capacities')
-    capacities = [60, 90]
-    for cap in capacities:
-        results = run_and_analyze_scenario(container_size=cap)
-        log_print(f'  Container Capacity: {cap} units:')
-        log_print(f'    Average Assembly Wait Time: {results['avg_assembly_wait_time_for_refill']:.2f} seconds.')
-        log_print(f'    Average Leftover Ingredients: {int(results['avg_total_leftovers'])} units.')
+    log_print(f'\nQC: Various container capacities, default safety stock ({c.SAFETY_STOCK_THRESHOLD:.1%})')
+    capacity_scenarios = [item for item in scenario_results if item['type'] == 'capacity']
+    for scenario in capacity_scenarios:
+        results = scenario['results']
+        log_print(f'    {scenario['name']}:')
+        log_print(f'      - Average assembly wait time for refill: {results['avg_assembly_wait_time_for_refill']:.2f} seconds.')
+        log_print(f'      - Average process time: {results['avg_process_time_per_burger'] / 60:.2f} minutes ({results['avg_process_time_per_burger']:.2f} seconds).')
+        log_print(f'      - Average leftover ingredients: {int(results['avg_total_leftovers'])} units.')
 
     log_print('\n' + '-' * 16, 'END OF RUN', '-' * 16, '\n')
 
