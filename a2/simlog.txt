@@ -1,0 +1,31 @@
+Running 1 simulations using 2 linecooks, 1 assemblers and 1 helpers.
+
+QA: Base scenario
+The average burger takes 30.51 minutes (1830.73 seconds) to process from receiving the order to finish packaging.
+The burger master experiences on average 0.00 seconds wait time for a container refill.
+There are on average 94 ingredients left over.
+
+QB: Various safety stocks
+  Safety Stock: 10.0%:
+    Average Assembly Wait Time: 0.58 seconds.
+    Average Process Time: 2087.45 seconds.
+  Safety Stock: 12.5%:
+    Average Assembly Wait Time: 2.36 seconds.
+    Average Process Time: 2120.95 seconds.
+  Safety Stock: 17.5%:
+    Average Assembly Wait Time: 0.81 seconds.
+    Average Process Time: 2486.80 seconds.
+  Safety Stock: 20.0%:
+    Average Assembly Wait Time: 0.81 seconds.
+    Average Process Time: 2486.80 seconds.
+
+QC: Various container capacities
+  Container Capacity: 60 units:
+    Average Assembly Wait Time: 0.06 seconds.
+    Average Leftover Ingredients: 275 units.
+  Container Capacity: 90 units:
+    Average Assembly Wait Time: 0.00 seconds.
+    Average Leftover Ingredients: 383 units.
+
+---------------- END OF RUN ---------------- 
+

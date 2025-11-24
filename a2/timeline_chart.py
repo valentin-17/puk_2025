@@ -13,6 +13,8 @@ useful. The plot shows the utilization of the linecooks as well as the utilizati
 clear that the burgermaster has high downtime and often waits for the preparation of the warm ingredients. This also
 visually confirms the numerical bottleneck that has been identified in the analysis step of the burgenerator.
 """
+import math
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -35,9 +37,11 @@ C_MAP = {
 }
 
 
-def create_gantt_chart(timeline_events, path):
+def create_gantt_chart(timeline_events: pd.DataFrame, path):
     """Creates and saves a Gantt chart of the burger simulation."""
     timeline_events['duration'] = timeline_events['end'] - timeline_events['start']
+
+    timeline_events.dropna(inplace=True)
 
     fig, ax = plt.subplots(figsize=(20, 10))
 
@@ -54,7 +58,7 @@ def create_gantt_chart(timeline_events, path):
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel('Order')
-    ax.set_title(f'Order Timeline ({c.N_LINECOOKS} linecooks, {c.N_ASSEMBLERS} assemblers)')
+    ax.set_title(f'Order Timeline ({c.N_LINECOOKS} linecooks, {c.N_ASSEMBLERS} assemblers), {c.N_HELPERS} helpers')
     ax.grid(True, which='major', axis='x', linestyle='--', linewidth=0.5)
     ax.vlines(c.ORDER_TIME, ymin=-1, ymax=200, color='navy', linestyles='dashed', linewidth=2, label='End of orders')
 
