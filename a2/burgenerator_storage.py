@@ -102,6 +102,7 @@ class Burgenerator:
             yield self.container[name].put(amount)
             refill_end = self.env.now
             self.timeline_events.append({
+                'stage': 'helper_work',
                 'start': refill_start,
                 'end': refill_end,
                 'resource': 'helper'
@@ -167,7 +168,7 @@ def _container_monitor(env, burgenerator):
                 'level': container.level
             })
             
-        reorder_threshold = c.CONTAINER_SIZE * c.REORDER_THRESHOLD
+        reorder_threshold = c.CONTAINER_SIZE * 2 * c.SAFETY_STOCK_THRESHOLD
 
         for name in burgenerator.container:
             if name in burgenerator.pending_refill:
@@ -315,14 +316,14 @@ def _analyze_results(burgenerator):
 
     return stats
 
-def run_single_simulation(seed, container_size=c.CONTAINER_SIZE, reorder_threshold=c.REORDER_THRESHOLD):
+def run_single_simulation(seed, container_size=c.CONTAINER_SIZE, safety_stock=c.SAFETY_STOCK_THRESHOLD):
     """Runs a single simulation with a set seed."""
     np.random.seed(seed)
     global GEN
     GEN = np.random.default_rng(seed)
 
-    original_reorder_threshold = c.REORDER_THRESHOLD
-    c.REORDER_THRESHOLD = reorder_threshold
+    original_safety_stock = c.SAFETY_STOCK_THRESHOLD
+    c.SAFETY_STOCK_THRESHOLD = safety_stock
     
     env = simpy.Environment()
     burgenerator = Burgenerator(env, container_size=container_size)
@@ -331,7 +332,7 @@ def run_single_simulation(seed, container_size=c.CONTAINER_SIZE, reorder_thresho
     env.process(_incoming_orders(env, burgenerator))
     env.run(until=3 * c.ORDER_TIME) # cuts the simulation after a set amount of time to prevent the resources getting stuck at the end
 
-    c.REORDER_THRESHOLD = original_reorder_threshold
+    c.SAFETY_STOCK_THRESHOLD = original_safety_stock
     
     return burgenerator
 
@@ -342,20 +343,20 @@ def log_print(*args, **kwargs):
         f.write(message + ('\n' if not kwargs.get('end') else ''))
     print(*args, **kwargs)
 
-def run_and_analyze_scenario(container_size=c.CONTAINER_SIZE, reorder_threshold=c.REORDER_THRESHOLD, return_levels=False):
+def run_and_analyze_scenario(container_size=c.CONTAINER_SIZE, safety_stock=c.SAFETY_STOCK_THRESHOLD, return_levels=False):
     """Runs a set of simulations for a given scenario and returns aggregated results."""
     all_results = []
     container_levels_for_first_run = None
     for i in range(c.N_SIMS):
         seed = c.SEED + i
-        burgenerator = run_single_simulation(seed, container_size, reorder_threshold)
+        burgenerator = run_single_simulation(seed, container_size, safety_stock)
         if i == 0 and return_levels:
             container_levels_for_first_run = burgenerator.container_levels
         all_results.append(_analyze_results(burgenerator))
 
     df = pd.DataFrame(all_results)
 
-    aggregated_results = {
+    results = {
         'container_size': container_size,
         'avg_process_time_per_burger': df['avg_process_time_per_burger'].mean(),
         'avg_assembly_wait_time_for_refill': df['avg_assembly_wait_time_for_refill'].mean(),
@@ -363,34 +364,31 @@ def run_and_analyze_scenario(container_size=c.CONTAINER_SIZE, reorder_threshold=
     }
 
     if return_levels:
-        aggregated_results['container_levels'] = container_levels_for_first_run
+        results['container_levels'] = container_levels_for_first_run
 
-    return aggregated_results
+    return results
 
 
 def run_and_collect_scenario_results(return_levels=False):
     """Runs all scenarios and collects their results."""
     all_scenario_results = []
 
-    # Baseline
-    baseline_results = run_and_analyze_scenario(reorder_threshold=c.REORDER_THRESHOLD, return_levels=return_levels)
+    baseline_results = run_and_analyze_scenario(safety_stock=c.SAFETY_STOCK_THRESHOLD, return_levels=return_levels)
     all_scenario_results.append({
         'name': 'Baseline',
         'results': baseline_results,
         'type': 'baseline'
     })
 
-    # Thresholds
     thresholds = [0.10, 0.125, 0.175, 0.20]
     for thresh in thresholds:
-        results = run_and_analyze_scenario(reorder_threshold=thresh, return_levels=return_levels)
+        results = run_and_analyze_scenario(safety_stock=thresh, return_levels=return_levels)
         all_scenario_results.append({
             'name': f'Safety Stock {thresh:.1%}',
             'results': results,
             'type': 'threshold'
         })
 
-    # Capacities
     capacities = [60, 90]
     for cap in capacities:
         results = run_and_analyze_scenario(container_size=cap, return_levels=return_levels)

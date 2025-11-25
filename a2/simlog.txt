@@ -36,3 +36,41 @@ QC: Various container capacities, default safety stock (15.0%)
 
 ---------------- END OF RUN ---------------- 
 
+Running 500 simulations using 2 linecooks, 1 assemblers and 1 helpers.
+
+QA: Base scenario
+    Safety Stock 15.0%, capacity 30:
+      - Average assembly wait time for refill: 0.27 seconds.
+      - Average process time: 35.28 minutes (2116.55 seconds).
+      - Average leftover ingredients: 115 units.
+
+QB: Various safety stocks, default container capacity (30 units)
+    Safety Stock 10.0%:
+      - Average assembly wait time for refill: 0.82 seconds.
+      - Average process time: 36.40 minutes (2183.88 seconds).
+      - Average leftover ingredients: 115 units.
+    Safety Stock 12.5%:
+      - Average assembly wait time for refill: 0.40 seconds.
+      - Average process time: 35.60 minutes (2136.06 seconds).
+      - Average leftover ingredients: 115 units.
+    Safety Stock 17.5%:
+      - Average assembly wait time for refill: 0.16 seconds.
+      - Average process time: 35.12 minutes (2107.34 seconds).
+      - Average leftover ingredients: 115 units.
+    Safety Stock 20.0%:
+      - Average assembly wait time for refill: 0.12 seconds.
+      - Average process time: 34.99 minutes (2099.65 seconds).
+      - Average leftover ingredients: 115 units.
+
+QC: Various container capacities, default safety stock (15.0%)
+    Container Size 60:
+      - Average assembly wait time for refill: 0.05 seconds.
+      - Average process time: 34.79 minutes (2087.42 seconds).
+      - Average leftover ingredients: 233 units.
+    Container Size 90:
+      - Average assembly wait time for refill: 0.03 seconds.
+      - Average process time: 34.79 minutes (2087.51 seconds).
+      - Average leftover ingredients: 385 units.
+
+---------------- END OF RUN ---------------- 
+

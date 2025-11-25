@@ -40,7 +40,8 @@ C_MAP = {
     'assembly_wait_for_refill': '#ffb14e',
     'assembly_wait': '#d1a7ef',
     'assembly_work': '#ba55aa',
-    'assembly_packing': '#840853'
+    'assembly_packing': '#840853',
+    'helper_work': '#bebedd'
 }
 
 C_MAP_THRESHOLD = {
