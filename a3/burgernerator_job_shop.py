@@ -1,5 +1,28 @@
+"""
+Planning and Configuration: Practical Task 3
+
+Scenario:
+  Instead of looking at the burger orders and the individual workers that process the orders this task proposed a
+  job-shop configuration with a focus on the flow of the burger order through different assembly stations. For this each
+  machine group has been initialized as a simpy resource with one worker.
+
+Implementation Details:
+  This implementation was written mostly from scratch since the old code from task 1 and 2 did not fit the new structure.
+  What remained similar is the plotting and analysis code that has been adapted to fit the task at hand. This adaptation
+  of plotting and analysis code (tracking of stats, accumulating data into dataframes etc.) has been done by ChatGPT in
+  large parts.
+
+  The core idea of this implementation is that the machines in the workshop are simpy resources with one worker each.
+  These resources are chained depending on the burger order which is passed through the individual stages of assembly.
+  All four burgertypes are assumed to occur uniformly distributed. There is no implementation of failure because it would
+  add a lot of complexity since we'd have to think of when to put the burger back into the queue and model this. This
+  could also lead to difficulties in task 4 which should build on this implementation.
+
+  ChatGPT also helped a lot in implementing some methods like the generic _sample_processing_time method or the timing
+  calculations within job_process.
+"""
 from collections import defaultdict
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Any
 import numpy as np
 import simpy
 import pandas as pd
@@ -107,8 +130,6 @@ def job_process(env: simpy.Environment, shop: BurgeneratorJobShop, burger_type: 
     # track per-job wait total and work total for easy summary
     job_wait = 0.0
     job_work = 0.0
-
-    route = shop.routing.get(burger_type, [])
 
     for (machine, variant) in shop.routing[burger_type]:
         wait_start = env.now
