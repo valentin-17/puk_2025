@@ -1,6 +1,6 @@
 # Simulation Params
 SEED = 42
-N_SIMS = 500
+N_SIMS = 1
 
 SIM_START = 0
 SIM_END = 3 * 3600  # 3 hours in seconds
