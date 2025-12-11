@@ -27,7 +27,7 @@ import numpy as np
 import simpy
 import pandas as pd
 
-import a3.config as c
+import a4.config as c
 
 GEN = np.random.default_rng(c.SEED)
 
@@ -421,7 +421,7 @@ def run_simulations(queue_rule: Literal["FIFO", "LIFO", "SPT", "LPT", "RANDOM", 
     requested comparisons (theoretical vs. actual per burger type, plus a recommendation).
     """
     n_sims = c.N_SIMS
-    queue_rules = ["FIFO", "LIFO", "SPT", "LPT", "RANDOM"] if compare_all_rules else [queue_rule]
+    queue_rules = ["FIFO", "LIFO", "SPT", "LPT", "RANDOM", "EDD"] if compare_all_rules else [queue_rule]
 
     log_print(f'Running {n_sims} replications of the job-shop model.')
 
