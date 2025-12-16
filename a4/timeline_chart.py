@@ -3,7 +3,7 @@ import matplotlib.ticker as mticker
 import pandas as pd
 import numpy as np
 
-from a3.burgernerator_job_shop import run_simulations
+from a4.burgernerator_job_shop import run_simulations
 
 
 def _aggregate_machine_table(stats_list):
@@ -75,6 +75,72 @@ def plot_sojourn_hist(stats_list, path):
     plt.title('Distribution of Job Sojourn Times')
     plt.tight_layout()
     #plt.show()
+    plt.savefig(path)
+
+
+def plot_sojourn_by_burger_and_rule(stats_by_rule, path):
+    """
+    Plot average sojourn time (minutes) per burger type, grouped by scheduling rule.
+    Accepts either a dict of {rule: [stats]} or a plain list of stats from one rule.
+    """
+    rows = []
+
+    def add_rows(rule_label, stats_list):
+        for stat in stats_list:
+            types = stat.get('order_stats', {}).get('burger_type', [])
+            sojourns = stat.get('order_stats', {}).get('sojourn_time', [])
+            for bt, sj in zip(types, sojourns):
+                rows.append({
+                    'burger_type': bt,
+                    'rule': rule_label,
+                    'sojourn_min': sj / 60.0
+                })
+
+    if isinstance(stats_by_rule, dict):
+        for rule_label, stats_list in stats_by_rule.items():
+            add_rows(rule_label, stats_list)
+    else:
+        label = stats_by_rule[0].get('queue_rule', 'selected') if stats_by_rule else 'selected'
+        add_rows(label, stats_by_rule)
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return
+
+    grouped = (
+        df.groupby(['burger_type', 'rule'])['sojourn_min']
+        .mean()
+        .reset_index()
+    )
+
+    burger_types = sorted(grouped['burger_type'].unique())
+    rules = sorted(grouped['rule'].unique())
+
+    x = np.arange(len(burger_types))
+    width = 0.8 / max(len(rules), 1)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    palette = ['#69a0cb', '#7ccba2', '#f4a261', '#e76f51', '#a07be3', '#4d908e']
+
+    for idx, rule in enumerate(rules):
+        vals = (
+            grouped[grouped['rule'] == rule]
+            .set_index('burger_type')
+            .reindex(burger_types)['sojourn_min']
+        )
+        ax.bar(x + (idx - (len(rules) - 1) / 2) * width,
+               vals,
+               width=width,
+               label=rule,
+               color=palette[idx % len(palette)])
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(burger_types)
+    ax.set_ylabel('Average Sojourn Time (min)')
+    ax.set_xlabel('Burger Type')
+    ax.set_title('Sojourn Time by Burger Type and Scheduling Rule')
+    ax.legend(title='Scheduling')
+    plt.tight_layout()
     plt.savefig(path)
 
 
@@ -162,10 +228,21 @@ def plot_gantt(timeline_events, path):
 
 
 if __name__ == '__main__':
-    stats = run_simulations()
+    stats_by_rule = run_simulations(return_by_rule=True)
 
-    plot_machine_utilization(stats, 'figures/machine_utilization.png')
-    plot_machine_wait_times(stats, 'figures/machine_wait_times.png')
-    plot_sojourn_hist(stats, 'figures/sojourn_times.png')
-    plot_queue_length_timeline(stats[0]['timeline_events'], 'figures/queue_lengths.png')
-    plot_gantt(stats[0]['timeline_events'], 'figures/machine_utilization_gantt.png')
+    # flatten stats across rules for the generic plots
+    flat_stats = []
+    if isinstance(stats_by_rule, dict):
+        for stats in stats_by_rule.values():
+            flat_stats.extend(stats)
+    else:
+        flat_stats = stats_by_rule
+
+    if flat_stats:
+        plot_machine_utilization(flat_stats, 'machine_utilization.png')
+        plot_machine_wait_times(flat_stats, 'machine_wait_times.png')
+        plot_sojourn_hist(flat_stats, 'sojourn_times.png')
+        plot_queue_length_timeline(flat_stats[0]['timeline_events'], 'queue_lengths.png')
+        plot_gantt(flat_stats[0]['timeline_events'], 'machine_utilization_gantt.png')
+
+    plot_sojourn_by_burger_and_rule(stats_by_rule, 'sojourn_by_burger_and_rule.png')

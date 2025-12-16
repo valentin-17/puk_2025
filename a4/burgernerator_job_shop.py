@@ -294,6 +294,7 @@ def analyze_results(shop: BurgeneratorJobShop) -> Dict[str, Any]:
     stats: Dict[str, Any] = {}
     total_sim_time = shop.env.now
     stats['total_sim_duration'] = total_sim_time
+    stats['queue_rule'] = shop.queue_rule
 
     stats['order_stats'] = shop.order_stats
     stats['timeline_events'] = shop.timeline_events
@@ -414,7 +415,8 @@ def log_print(*args, **kwargs):
 
 
 def run_simulations(queue_rule: Literal["FIFO", "LIFO", "SPT", "LPT", "RANDOM", "EDD"] = "FIFO",
-                    compare_all_rules: bool = True):
+                    compare_all_rules: bool = True,
+                    return_by_rule: bool = False):
     """Orchestrate multiple simulations, compute aggregated metrics and print them.
 
     If compare_all_rules is True, runs the requested analysis for FIFO, LIFO, SPT, LPT and RANDOM and logs the
@@ -431,6 +433,8 @@ def run_simulations(queue_rule: Literal["FIFO", "LIFO", "SPT", "LPT", "RANDOM", 
         log_print(f"- {burger}: {t:.2f} s")
 
     overall_sojourn_by_rule: Dict[str, float] = {}
+
+    results_by_rule: Dict[str, List[Dict[str, Any]]] = {}
 
     for rule in queue_rules:
         log_print(f'\n--- Strategy {rule} ---')
@@ -482,8 +486,12 @@ def run_simulations(queue_rule: Literal["FIFO", "LIFO", "SPT", "LPT", "RANDOM", 
             diff = actual_mean - min_val
             log_print(f"- {bt}: Actual {actual_mean:.2f} s | Minimum {min_val:.2f} s | Difference {diff:.2f} s")
 
+        if return_by_rule:
+            results_by_rule[rule] = all_stats
 
     log_print('-' * 40, 'END OF RUN', '-' * 40)
+    if return_by_rule:
+        return results_by_rule if compare_all_rules else {queue_rule: all_stats}
     return all_stats
 
 
