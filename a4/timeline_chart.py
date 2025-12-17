@@ -239,10 +239,10 @@ if __name__ == '__main__':
         flat_stats = stats_by_rule
 
     if flat_stats:
-        plot_machine_utilization(flat_stats, 'machine_utilization.png')
-        plot_machine_wait_times(flat_stats, 'machine_wait_times.png')
-        plot_sojourn_hist(flat_stats, 'sojourn_times.png')
-        plot_queue_length_timeline(flat_stats[0]['timeline_events'], 'queue_lengths.png')
-        plot_gantt(flat_stats[0]['timeline_events'], 'machine_utilization_gantt.png')
+        plot_machine_utilization(flat_stats, 'figures/machine_utilization.png')
+        plot_machine_wait_times(flat_stats, 'figures/machine_wait_times.png')
+        plot_sojourn_hist(flat_stats, 'figures/sojourn_times.png')
+        plot_queue_length_timeline(flat_stats[0]['timeline_events'], 'figures/queue_lengths.png')
+        plot_gantt(flat_stats[0]['timeline_events'], 'figures/machine_utilization_gantt.png')
 
-    plot_sojourn_by_burger_and_rule(stats_by_rule, 'sojourn_by_burger_and_rule.png')
+    plot_sojourn_by_burger_and_rule(stats_by_rule, 'figures/sojourn_by_burger_and_rule.png')
